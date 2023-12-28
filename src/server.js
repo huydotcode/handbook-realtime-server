@@ -141,7 +141,7 @@ io.on('connection', async (sk) => {
 });
 
 app.get('/', (req, res) => {
-    res.send('Hello World!');
+    res.send('Hello everyone change 1!');
 });
 
 mongoose.connect(process.env.MONGODB_URI).then(() => {
