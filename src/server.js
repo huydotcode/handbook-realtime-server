@@ -11,6 +11,7 @@ const app = express();
 const httpServer = createServer(app);
 const PORT = 5000;
 
+// fix CORS error
 const io = new Server(httpServer, {
     cors: {
         origin: ['http://localhost:3000', 'https://handbookk.vercel.app'],
@@ -33,35 +34,54 @@ app.use(
 
 dotenv.config();
 
-io.use((socket, next) => {
-    if (socket.user) next();
+function log(event, data) {
+    console.log(
+        `\n[${new Date().toLocaleTimeString()}] ${event.toUpperCase()}:`
+    );
 
-    const user = socket.handshake.auth.user;
-    if (!user) {
-        return next(new Error('invalid user'));
+    if (data) {
+        console.log('\tAGRS: ', data);
     }
-    socket.user = user;
-    next();
-});
+    console.log('====================================');
+}
 
 io.on('connection', async (sk) => {
-    console.log('Client connected');
-    await User.findByIdAndUpdate(sk.user.id, { isOnline: true });
+    log('A CLIENT CONNECTED', sk.id);
 
-    const users = [];
+    if (!sk.handshake.auth.user) return;
+    let userId = sk.handshake.auth.user?.id;
+    if (!userId) return;
+
+    console.log('USER ID', userId);
+
+    const user = await User.findById(userId).select('-password');
+
+    if (!user) return;
+
+    let usersIsConnected = [];
 
     for (let [id, socket] of io.of('/').sockets) {
-        users.push({
-            socketId: id,
-            userId: socket.user.id,
-            name: socket.user.name,
-            image: socket.user.image,
-        });
+        const user = socket.handshake.auth.user;
 
-        users.filter((user) => user.userId !== sk.user.id);
+        if (user) {
+            usersIsConnected.push({
+                socketId: id,
+                userId: user.id,
+                name: user.name,
+                image: user.image,
+            });
+        }
     }
 
-    sk.broadcast.emit('users', users);
+    log('USERS', usersIsConnected);
+
+    sk.on('disconnect', async () => {
+        log('A CLIENT DISCONNECTED', sk.id);
+        usersIsConnected = usersIsConnected.filter(
+            (user) => user.userId !== userId
+        );
+        log('USERS AFTER A CLIENT DISCONNECTED', usersIsConnected);
+    });
 
     sk.on('join-room', async ({ roomId }) => {
         console.log('JOIN ROOM');
@@ -90,33 +110,36 @@ io.on('connection', async (sk) => {
     });
 
     sk.on('leave-room', ({ roomId }) => {
+        console.log('LEAVE ROOM');
         sk.leave(roomId);
     });
 
     sk.on('send-message', (message) => {
+        console.log('SEND MESSAGE');
         io.to(message.roomId).emit('receive-message', message);
     });
 
     sk.on('delete-message', (message) => {
+        console.log('DELETE MESSAGE');
         io.to(message.roomId).emit('delete-message', message);
     });
 
-    sk.on('users', (param) => {
-        const users = [];
+    // sk.on('users', (param) => {
+    //     const users = [];
 
-        for (let [id, socket] of io.of('/').sockets) {
-            users.push({
-                socketId: id,
-                userId: socket.user.id,
-                name: socket.user.name,
-                image: socket.user.image,
-            });
+    //     for (let [id, socket] of io.of('/').sockets) {
+    //         users.push({
+    //             socketId: id,
+    //             userId: socket.user.id,
+    //             name: socket.user.name,
+    //             image: socket.user.image,
+    //         });
 
-            users.filter((user) => user.userId !== sk.user.id);
-        }
+    //         users.filter((user) => user.userId !== sk.user.id);
+    //     }
 
-        sk.emit('users', users);
-    });
+    //     sk.emit('users', users);
+    // });
 
     sk.on('disconnect', async () => {
         await User.findByIdAndUpdate(sk.user.id, { isOnline: false });
@@ -138,6 +161,8 @@ io.on('connection', async (sk) => {
 
         sk.broadcast.emit('users', users);
     });
+
+    sk.broadcast.emit('users', usersIsConnected);
 });
 
 app.get('/', (req, res) => {
