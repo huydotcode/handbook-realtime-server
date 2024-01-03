@@ -52,13 +52,12 @@ io.on('connection', async (sk) => {
     let userId = sk.handshake.auth.user?.id;
     if (!userId) return;
 
-    console.log('USER ID', userId);
-
     const user = await User.findById(userId).select('-password');
 
     if (!user) return;
 
     let usersIsConnected = [];
+    const friends = user.friends.map((friend) => friend._id.toString());
 
     for (let [id, socket] of io.of('/').sockets) {
         const user = socket.handshake.auth.user;
@@ -73,20 +72,42 @@ io.on('connection', async (sk) => {
         }
     }
 
-    log('USERS', usersIsConnected);
+    sk.on('add-friend', async ({ friendId }) => {
+        console.log('ADD FRIEND');
 
-    sk.on('disconnect', async () => {
-        log('A CLIENT DISCONNECTED', sk.id);
-        usersIsConnected = usersIsConnected.filter(
-            (user) => user.userId !== userId
-        );
-        log('USERS AFTER A CLIENT DISCONNECTED', usersIsConnected);
+        const friend = await User.findById(friendId).select('-password');
+
+        if (!friend) return;
+
+        const isFriend = friends.find((friend) => friend._id == friendId);
+
+        if (isFriend) return;
+
+        await User.findByIdAndUpdate(userId, {
+            $push: { friends: friendId },
+        });
+
+        const user = await User.findById(friendId).select('-password');
+
+        friends.push(friendId);
+
+        sk.emit('add-friend-success', user);
+    });
+
+    sk.on('un-friend', async ({ friendId }) => {
+        log('UN FRIEND', friendId);
+
+        await User.findByIdAndUpdate(userId, {
+            $pull: { friends: friendId },
+        });
+
+        sk.emit('un-friend-success', friendId);
     });
 
     sk.on('join-room', async ({ roomId }) => {
         console.log('JOIN ROOM');
         await Message.updateMany(
-            { roomId, userId: { $ne: sk.user.id } },
+            { roomId, userId: { $ne: userId } },
             { isRead: true }
         );
 
@@ -95,7 +116,7 @@ io.on('connection', async (sk) => {
 
     sk.on('read-message', ({ roomId }) => {
         console.log('READ MESSAGE');
-        sk.to(roomId).emit('read-message', { roomId, userId: sk.user.id });
+        sk.to(roomId).emit('read-message', { roomId, userId: userId });
     });
 
     sk.on('get-last-messages', async ({ roomId }) => {
@@ -124,42 +145,12 @@ io.on('connection', async (sk) => {
         io.to(message.roomId).emit('delete-message', message);
     });
 
-    // sk.on('users', (param) => {
-    //     const users = [];
-
-    //     for (let [id, socket] of io.of('/').sockets) {
-    //         users.push({
-    //             socketId: id,
-    //             userId: socket.user.id,
-    //             name: socket.user.name,
-    //             image: socket.user.image,
-    //         });
-
-    //         users.filter((user) => user.userId !== sk.user.id);
-    //     }
-
-    //     sk.emit('users', users);
-    // });
-
     sk.on('disconnect', async () => {
-        await User.findByIdAndUpdate(sk.user.id, { isOnline: false });
-
-        const users = [];
-
-        for (let [id, socket] of io.of('/').sockets) {
-            users.push({
-                socketId: id,
-                userId: socket.user.id,
-                name: socket.user.name,
-                image: socket.user.image,
-            });
-
-            users.filter((user) => user.userId !== sk.user.id);
-        }
-
-        users.filter((user) => user.userId !== sk.user.id);
-
-        sk.broadcast.emit('users', users);
+        log('A CLIENT DISCONNECTED', sk.id);
+        usersIsConnected = usersIsConnected.filter(
+            (user) => user.userId !== userId
+        );
+        log('USERS AFTER A CLIENT DISCONNECTED', usersIsConnected);
     });
 
     sk.broadcast.emit('users', usersIsConnected);
