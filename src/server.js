@@ -49,31 +49,29 @@ io.on('connection', async (sk) => {
     log('A CLIENT CONNECTED', sk.id);
 
     if (!sk.handshake.auth.user) return;
+
     let userId = sk.handshake.auth.user?.id;
     if (!userId) return;
 
+    // Get user
     const user = await User.findById(userId).select('-password');
-
+    user.isOnline = true;
+    await user.save();
     if (!user) return;
 
-    let usersIsConnected = [];
+    // Get friends
     const friends = user.friends.map((friend) => friend._id.toString());
 
     for (let [id, socket] of io.of('/').sockets) {
         const user = socket.handshake.auth.user;
 
-        if (user) {
-            usersIsConnected.push({
-                socketId: id,
-                userId: user.id,
-                name: user.name,
-                image: user.image,
-            });
+        if (user && friends.includes(user.id) && user.id !== userId) {
+            io.to(id).emit('friend-online', userId);
         }
     }
 
     sk.on('add-friend', async ({ friendId }) => {
-        console.log('ADD FRIEND');
+        log('ADD FRIEND', friendId);
 
         const friend = await User.findById(friendId).select('-password');
 
@@ -91,6 +89,14 @@ io.on('connection', async (sk) => {
 
         friends.push(friendId);
 
+        for (let [id, socket] of io.of('/').sockets) {
+            const user = socket.handshake.auth.user;
+
+            if (user && friends.includes(user.id) && user.id !== userId) {
+                io.to(id).emit('friend-online', userId);
+            }
+        }
+
         sk.emit('add-friend-success', user);
     });
 
@@ -100,6 +106,14 @@ io.on('connection', async (sk) => {
         await User.findByIdAndUpdate(userId, {
             $pull: { friends: friendId },
         });
+
+        for (let [id, socket] of io.of('/').sockets) {
+            const user = socket.handshake.auth.user;
+
+            if (user && friends.includes(user.id) && user.id !== userId) {
+                io.to(id).emit('friend-online', userId);
+            }
+        }
 
         sk.emit('un-friend-success', friendId);
     });
@@ -147,17 +161,16 @@ io.on('connection', async (sk) => {
 
     sk.on('disconnect', async () => {
         log('A CLIENT DISCONNECTED', sk.id);
-        usersIsConnected = usersIsConnected.filter(
-            (user) => user.userId !== userId
-        );
-        log('USERS AFTER A CLIENT DISCONNECTED', usersIsConnected);
-    });
 
-    sk.broadcast.emit('users', usersIsConnected);
+        user.isOnline = false;
+        await user.save();
+
+        sk.broadcast.emit('user-disconnected', userId);
+    });
 });
 
 app.get('/', (req, res) => {
-    res.send('Hello everyone change 1!');
+    res.send('Hello everyone change 2!');
 });
 
 mongoose.connect(process.env.MONGODB_URI).then(() => {
