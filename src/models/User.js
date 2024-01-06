@@ -45,6 +45,10 @@ const UserSchema = new Schema(
                 },
             },
         ],
+        lastAccessed: {
+            type: Date,
+            default: new Date(),
+        },
     },
     {
         timestamps: true,

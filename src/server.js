@@ -163,6 +163,7 @@ io.on('connection', async (sk) => {
         log('A CLIENT DISCONNECTED', sk.id);
 
         user.isOnline = false;
+        user.lastAccessed = new Date();
         await user.save();
 
         sk.broadcast.emit('user-disconnected', userId);
