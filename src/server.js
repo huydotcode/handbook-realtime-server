@@ -292,39 +292,41 @@ io.on('connection', async (sk) => {
     });
 
     sk.on('join-room', async ({ roomId }) => {
-        console.log('JOIN ROOM');
+        log('JOIN ROOM', roomId);
+        sk.join(roomId);
+    });
+
+    sk.on('read-message', async ({ roomId }) => {
+        log('READ MESSAGE', roomId);
         await Message.updateMany(
             { roomId, userId: { $ne: userId } },
             { isRead: true }
         );
 
-        sk.join(roomId);
-    });
-
-    sk.on('read-message', ({ roomId }) => {
-        console.log('READ MESSAGE');
         sk.to(roomId).emit('read-message', { roomId, userId: userId });
     });
 
     sk.on('get-last-messages', async ({ roomId }) => {
-        console.log('GET LAST MESSAGE');
+        log('GET LAST MESSAGES', roomId);
         const lastMsg = await Message.find({ roomId })
             .sort({ createdAt: -1 })
             .limit(1);
-        sk.emit('get-last-messages', {
+
+        io.to(roomId).emit('get-last-messages', {
             roomId,
             data: lastMsg[0],
         });
     });
 
     sk.on('leave-room', ({ roomId }) => {
-        console.log('LEAVE ROOM');
+        log('LEAVE ROOM', roomId);
         sk.leave(roomId);
     });
 
     sk.on('send-message', (message) => {
-        console.log('SEND MESSAGE');
-        io.to(message.roomId).emit('receive-message', message);
+        log('SEND MESSAGE');
+        const { roomId, text, userId } = message;
+        io.to(roomId).emit('receive-message', message);
     });
 
     sk.on('delete-message', (message) => {
