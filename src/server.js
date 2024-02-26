@@ -330,7 +330,7 @@ io.on('connection', async (sk) => {
     });
 
     sk.on('delete-message', (message) => {
-        console.log('DELETE MESSAGE');
+        log('DELETE MESSAGE');
         io.to(message.roomId).emit('delete-message', message);
     });
 
