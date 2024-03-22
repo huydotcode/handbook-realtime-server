@@ -2,16 +2,20 @@ import { Schema, model } from 'mongoose';
 
 const MessageSchema = new Schema(
     {
-        userId: {
+        senderId: {
             type: Schema.Types.ObjectId,
             required: true,
         },
-        roomId: {
+        conversation: {
             type: String,
             required: true,
         },
         text: {
             type: String,
+        },
+        images: {
+            type: [Schema.Types.ObjectId],
+            default: [],
         },
         isRead: {
             type: Boolean,

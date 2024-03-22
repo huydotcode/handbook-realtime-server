@@ -1,12 +1,11 @@
-import { createServer } from 'http';
-import { Server } from 'socket.io';
-import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import express from 'express';
+import { createServer } from 'http';
 import mongoose from 'mongoose';
-import User from './models/User.js';
+import { Server } from 'socket.io';
 import Message from './models/Message.js';
-import Notification from './models/Notification.js';
+import User from './models/User.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -21,6 +20,25 @@ const io = new Server(httpServer, {
         credentials: true,
     },
 });
+
+const socketEvent = {
+    // FRIEND REQUEST
+    SEND_REQUEST_ADD_FRIEND: 'send-request-add-friend',
+    ACCEPT_FRIEND: 'accept-friend',
+    UN_FRIEND: 'un-friend',
+
+    // NOTIFICATION
+    RECEIVE_NOTIFICATION: 'receive-notification',
+
+    // Message
+    JOIN_ROOM: 'join-room',
+    READ_MESSAGE: 'read-message',
+    SEND_MESSAGE: 'send-message',
+    GET_LAST_MESSAGE: 'get-last-message',
+    RECEIVE_MESSAGE: 'receive-message',
+    DELETE_MESSAGE: 'delete-message',
+    LEAVE_ROOM: 'leave-room',
+};
 
 // @ts-ignore
 app.use(express.json({ limit: '5mb' }));
@@ -46,6 +64,9 @@ function log(event, data) {
     console.log('====================================');
 }
 
+const users = {};
+const chatRooms = {};
+
 io.on('connection', async (sk) => {
     log('A CLIENT CONNECTED', sk.id);
 
@@ -54,14 +75,13 @@ io.on('connection', async (sk) => {
     let userId = sk.handshake.auth.user?.id;
     if (!userId) return;
 
-    // Get user
     const currentUser = await User.findById(userId).select('-password');
-    currentUser.isOnline = true;
-    await currentUser.save();
     if (!currentUser) return;
 
-    // Get friends
-    const friends = currentUser.friends.map((friend) => friend._id.toString());
+    currentUser.isOnline = true;
+    await currentUser.save();
+
+    const friends = currentUser.friends;
 
     for (let [id, socket] of io.of('/').sockets) {
         const user = socket.handshake.auth.user;
@@ -87,252 +107,103 @@ io.on('connection', async (sk) => {
         3.2. Gửi thông báo cho B
     */
 
-    sk.on('send-request-add-friend', async ({ receiverId }) => {
+    sk.on(socketEvent.SEND_REQUEST_ADD_FRIEND, async ({ request }) => {
         log('SEND REQUEST ADD FRIEND');
-
-        const friendNotification = await Notification.findOne({
-            type: 'friend',
-            send: receiverId,
-            receive: currentUser._id,
-        });
-
-        const currentUserNotification = await Notification.findOne({
-            type: 'friend',
-            send: currentUser._id,
-            receive: receiverId,
-        });
-
-        if (currentUserNotification) {
-            console.log('Bạn đã gửi lời mời kết bạn cho bạn này');
-            return;
-        }
-
-        // Kiểm tra xem đã có lời mời kết bạn chưa
-        if (friendNotification) {
-            console.log('Bạn của bạn đã gửi lời mời kết bạn cho bạn');
-            return;
-        }
-
-        // Kiểm tra xem đã là bạn bè chưa
-        if (friends.includes(receiverId)) {
-            console.log("You're already friends");
-            return;
-        }
-
-        const friend = await User.findById(receiverId).select('-password');
-        if (!friend) return;
-
-        // Kiểm tra xem đã có lời mời kết bạn chưa
-        const oldNotification = await Notification.findOne({
-            type: 'friend',
-            send: currentUser._id,
-            receive: friend._id,
-        });
-
-        // Nếu đã có lời mời kết bạn thì xóa lời mời kết bạn và thêm vào danh sách bạn bè
-        if (oldNotification) {
-            await Notification.findByIdAndDelete(oldNotification._id);
-            friend.friends.push(currentUser._id);
-            await friend.save();
-
-            currentUser.friends.push(friend._id);
-            await currentUser.save();
-
-            friends.push(receiverId);
-            return;
-        }
-
-        // Tạo lời mời kết bạn
-        const newNotification = await Notification({
-            type: 'friend',
-            send: currentUser._id,
-            receive: friend._id,
-        });
-
-        await newNotification.save();
-
-        const notification = await Notification.findById(
-            newNotification._id
-        ).populate('send', '_id name image');
 
         // Gửi lời mời kết bạn cho B
         for (let [id, socket] of io.of('/').sockets) {
             const userSocket = socket.handshake.auth.user;
 
-            if (userSocket && userSocket.id === friend._id.toString()) {
-                io.to(id).emit('receive-request-add-friend', {
-                    notification: notification,
+            if (userSocket && userSocket.id === request.receiver) {
+                io.to(id).emit('receive-notification', {
+                    notification: request,
                 });
             }
         }
     });
 
-    sk.on('accept-request-add-friend', async ({ notificationId, senderId }) => {
-        log('ACCEPT REQUEST ADD FRIEND', {
-            notificationId,
-            senderId,
-        });
-
-        // Kiểm tra xem đã là bạn chưa
-        if (
-            friends.includes(senderId) ||
-            currentUser.friends.includes(senderId)
-        ) {
-            console.log('Đã là bạn bè');
-            return;
-        }
-
-        currentUser.friends.push(senderId);
-        friends.push(senderId);
-        await currentUser.save();
-
-        const sender = await User.findById(senderId).select('-password');
-        sender.friends.push(currentUser._id);
-        await sender.save();
-
-        await Notification.findByIdAndDelete(notificationId);
+    sk.on(socketEvent.RECEIVE_NOTIFICATION, async ({ notification }) => {
+        log('RECEIVE NOTIFICATION');
 
         for (let [id, socket] of io.of('/').sockets) {
             const user = socket.handshake.auth.user;
 
-            if (user && friends.includes(user.id) && user.id !== userId) {
-                io.to(id).emit('friend-online', userId);
+            if (user && user.id === notification.receiver) {
+                io.to(id).emit('receive-notification', {
+                    notification,
+                });
             }
-
-            if (user && user.id === senderId) {
-                io.to(id).emit('add-friend-success', currentUser);
-            }
-        }
-
-        sk.emit('add-friend-success', sender);
-
-        // Kiểm tra nếu notification của 2 người đã có thì xóa
-        const oldNotification = await Notification.findOne({
-            type: 'friend',
-            send: senderId,
-            receive: currentUser._id,
-        });
-
-        if (oldNotification) {
-            await Notification.findByIdAndDelete(oldNotification._id);
-        }
-
-        const oldNotification2 = await Notification.findOne({
-            type: 'friend',
-            send: currentUser._id,
-            receive: senderId,
-        });
-
-        if (oldNotification2) {
-            await Notification.findByIdAndDelete(oldNotification2._id);
         }
     });
 
-    sk.on(
-        'decline-request-add-friend',
-        async ({ notificationId, senderId }) => {
-            log('DECLINE REQUEST ADD FRIEND', {
-                notificationId,
-            });
-
-            // Kiểm tra xem đã là bạn chưa
-            if (friends.includes(senderId)) {
-                console.log('Đã là bạn bè');
-                currentUser.friends.filter((friend) => friend !== senderId);
-                await currentUser.save();
-            }
-
-            await Notification.findByIdAndDelete(notificationId);
-
-            // Kiểm tra nếu notification của 2 người đã có thì xóa
-            const oldNotification = await Notification.findOne({
-                type: 'friend',
-                send: senderId,
-                receive: currentUser._id,
-            });
-
-            if (oldNotification) {
-                await Notification.findByIdAndDelete(oldNotification._id);
-            }
-
-            const oldNotification2 = await Notification.findOne({
-                type: 'friend',
-                send: currentUser._id,
-                receive: senderId,
-            });
-
-            if (oldNotification2) {
-                await Notification.findByIdAndDelete(oldNotification2._id);
-            }
-        }
-    );
-
-    sk.on('un-friend', async ({ friendId }) => {
-        log('UN FRIEND', friendId);
-
-        await User.findByIdAndUpdate(userId, {
-            $pull: { friends: friendId },
-        });
-
-        await User.findByIdAndUpdate(friendId, {
-            $pull: { friends: userId },
-        });
-
-        friends.filter((friend) => friend !== friendId);
-
-        for (let [id, socket] of io.of('/').sockets) {
-            const user = socket.handshake.auth.user;
-
-            if (user && friends.includes(user.id) && user.id !== userId) {
-                io.to(id).emit('friend-online', userId);
-            }
+    sk.on(socketEvent.JOIN_ROOM, async ({ roomId }) => {
+        if (!chatRooms[roomId]) {
+            chatRooms[roomId] = new Set();
         }
 
-        sk.emit('un-friend-success', friendId);
-    });
+        if (!chatRooms[roomId].has(sk.id)) {
+            chatRooms[roomId].add(sk.id);
+        }
 
-    sk.on('join-room', async ({ roomId }) => {
-        log('JOIN ROOM', roomId);
         sk.join(roomId);
     });
 
-    sk.on('read-message', async ({ roomId }) => {
+    sk.on(socketEvent.READ_MESSAGE, async ({ roomId }) => {
         log('READ MESSAGE', roomId);
         await Message.updateMany(
             { roomId, userId: { $ne: userId } },
             { isRead: true }
         );
 
-        sk.to(roomId).emit('read-message', { roomId, userId: userId });
+        sk.to(roomId).emit(socketEvent.READ_MESSAGE, {
+            roomId,
+            userId: userId,
+        });
     });
 
-    sk.on('get-last-messages', async ({ roomId }) => {
+    sk.on(socketEvent.GET_LAST_MESSAGE, async ({ roomId }) => {
         log('GET LAST MESSAGES', roomId);
         const lastMsg = await Message.find({ roomId })
             .sort({ createdAt: -1 })
             .limit(1);
 
-        io.to(roomId).emit('get-last-messages', {
+        io.to(roomId).emit(socketEvent.GET_LAST_MESSAGE, {
             roomId,
             data: lastMsg[0],
         });
     });
 
-    sk.on('leave-room', ({ roomId }) => {
+    sk.on(socketEvent.LEAVE_ROOM, ({ roomId }) => {
         log('LEAVE ROOM', roomId);
         sk.leave(roomId);
     });
 
-    sk.on('send-message', (message) => {
+    sk.on(socketEvent.SEND_MESSAGE, (message) => {
         log('SEND MESSAGE');
-        const { roomId, text, userId } = message;
-        io.to(roomId).emit('receive-message', message);
+        const { conversation } = message;
+
+        if (chatRooms[conversation]) {
+            io.to(conversation).emit(socketEvent.RECEIVE_MESSAGE, message);
+        }
+
+        // Emit get last message
+        io.to(conversation).emit(socketEvent.GET_LAST_MESSAGE, {
+            roomId: conversation,
+            data: message,
+        });
     });
 
-    sk.on('delete-message', (message) => {
-        log('DELETE MESSAGE');
-        io.to(message.roomId).emit('delete-message', message);
-    });
+    sk.on(
+        socketEvent.DELETE_MESSAGE,
+        ({ prevMessage: prevMsg, currentMessage: msg }) => {
+            log('DELETE MESSAGE');
+
+            io.to(msg.conversation).emit(socketEvent.DELETE_MESSAGE, {
+                prevMsg,
+                msg,
+            });
+        }
+    );
 
     sk.on('disconnect', async () => {
         log('A CLIENT DISCONNECTED', sk.id);
@@ -342,6 +213,12 @@ io.on('connection', async (sk) => {
         await currentUser.save();
 
         sk.broadcast.emit('user-disconnected', userId);
+
+        for (const roomId in chatRooms) {
+            if (chatRooms[roomId].has(sk.id)) {
+                chatRooms[roomId].delete(sk.id);
+            }
+        }
     });
 });
 

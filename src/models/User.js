@@ -15,39 +15,31 @@ const UserSchema = new Schema(
             type: String,
             required: true,
         },
-        image: {
+        avatar: {
             type: String,
             required: true,
+        },
+        role: {
+            type: String,
+            default: 'user',
         },
         isOnline: {
             type: Boolean,
             default: false,
         },
+        isBlocked: {
+            type: Boolean,
+            default: false,
+        },
         password: String,
-        given_name: String,
-        family_name: String,
+        givenName: String,
+        familyName: String,
         locale: String,
-        dateOfBirth: Date,
         friends: [{ type: Schema.Types.ObjectId, ref: 'User' }],
         followers: [{ type: Schema.Types.ObjectId, ref: 'User' }],
-        following: [{ type: Schema.Types.ObjectId, ref: 'User' }],
-        notifications: [{ type: Schema.Types.ObjectId, ref: 'Notification' }],
-        request: [
-            {
-                to: {
-                    type: Schema.Types.ObjectId,
-                    required: true,
-                },
-                type: {
-                    type: String,
-                    required: true,
-                    default: 'friend',
-                },
-            },
-        ],
         lastAccessed: {
             type: Date,
-            default: new Date(),
+            default: Date.now(),
         },
     },
     {
