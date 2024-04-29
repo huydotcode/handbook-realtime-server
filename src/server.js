@@ -141,6 +141,8 @@ io.on('connection', async (sk) => {
             chatRooms[roomId] = new Set();
         }
 
+        log('JOIN ROOM', roomId);
+
         if (!chatRooms[roomId].has(sk.id)) {
             chatRooms[roomId].add(sk.id);
         }
