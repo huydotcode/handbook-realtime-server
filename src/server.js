@@ -64,7 +64,6 @@ function log(event, data) {
     console.log('====================================');
 }
 
-const users = {};
 const chatRooms = {};
 
 io.on('connection', async (sk) => {
@@ -186,9 +185,8 @@ io.on('connection', async (sk) => {
 
         if (chatRooms[conversation]) {
             io.to(conversation).emit(socketEvent.RECEIVE_MESSAGE, message);
-        }
+        } 
 
-        // Emit get last message
         io.to(conversation).emit(socketEvent.GET_LAST_MESSAGE, {
             roomId: conversation,
             data: message,
