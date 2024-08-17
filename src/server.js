@@ -6,6 +6,8 @@ import mongoose from 'mongoose';
 import { Server } from 'socket.io';
 import Message from './models/Message.js';
 import User from './models/User.js';
+import Participant from './models/Participant.js';
+import Conversation from './models/Conversation.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -106,6 +108,35 @@ io.on('connection', async (sk) => {
         3.2. Gửi thông báo cho B
     */
 
+    // Tham gia các cuộc hội thoại
+    const participantsOfUser = await Participant.find({
+        user: currentUser._id
+    })
+
+    const conversations = await Conversation.find({
+        participants: {
+            $in: participantsOfUser.map(par => par._id)
+        }
+    })
+
+    const joinRoom = (conversationId) => {
+        if (!chatRooms[conversationId]) {
+            chatRooms[conversationId] = new Set();  
+        }
+
+        log('JOIN ROOM', conversationId.toString());
+
+        if (!chatRooms[conversationId].has(sk.id)) {
+            chatRooms[conversationId].add(sk.id);
+        }
+
+        sk.join(conversationId);        
+    }
+
+    for (const conversation of conversations) {
+        joinRoom(conversation._id);
+    }
+
     sk.on(socketEvent.SEND_REQUEST_ADD_FRIEND, async ({ request }) => {
         log('SEND REQUEST ADD FRIEND');
 
@@ -137,7 +168,7 @@ io.on('connection', async (sk) => {
 
     sk.on(socketEvent.JOIN_ROOM, async ({ roomId }) => {
         if (!chatRooms[roomId]) {
-            chatRooms[roomId] = new Set();
+            chatRooms[roomId] = new Set();  
         }
 
         log('JOIN ROOM', roomId);
@@ -182,12 +213,11 @@ io.on('connection', async (sk) => {
     sk.on(socketEvent.SEND_MESSAGE, (message) => {
         log('SEND MESSAGE');
         const { conversation } = message;
+        const conversationId = conversation._id;
 
-        if (chatRooms[conversation]) {
-            io.to(conversation).emit(socketEvent.RECEIVE_MESSAGE, message);
-        } 
+        io.to(conversation._id).emit(socketEvent.RECEIVE_MESSAGE, message);
 
-        io.to(conversation).emit(socketEvent.GET_LAST_MESSAGE, {
+        io.to(conversation._id).emit(socketEvent.GET_LAST_MESSAGE, {
             roomId: conversation,
             data: message,
         });
