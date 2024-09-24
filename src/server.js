@@ -4,10 +4,10 @@ import express from 'express';
 import { createServer } from 'http';
 import mongoose from 'mongoose';
 import { Server } from 'socket.io';
-import Message from './models/Message.js';
-import User from './models/User.js';
-import Participant from './models/Participant.js';
 import Conversation from './models/Conversation.js';
+import Message from './models/Message.js';
+import Participant from './models/Participant.js';
+import User from './models/User.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -36,7 +36,6 @@ const socketEvent = {
     JOIN_ROOM: 'join-room',
     READ_MESSAGE: 'read-message',
     SEND_MESSAGE: 'send-message',
-    GET_LAST_MESSAGE: 'get-last-message',
     RECEIVE_MESSAGE: 'receive-message',
     DELETE_MESSAGE: 'delete-message',
     LEAVE_ROOM: 'leave-room',
@@ -215,12 +214,7 @@ io.on('connection', async (sk) => {
         const { conversation } = message;
         const conversationId = conversation._id;
 
-        io.to(conversation._id).emit(socketEvent.RECEIVE_MESSAGE, message);
-
-        io.to(conversation._id).emit(socketEvent.GET_LAST_MESSAGE, {
-            roomId: conversation,
-            data: message,
-        });
+        io.to(conversationId).emit(socketEvent.RECEIVE_MESSAGE, message);
     });
 
     sk.on(
