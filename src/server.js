@@ -73,9 +73,13 @@ io.on('connection', async (sk) => {
     if (!sk.handshake.auth.user) return;
 
     let userId = sk.handshake.auth.user?.id;
+
+    console.log("UserId: ", userId);
     if (!userId) return;
 
     const currentUser = await User.findById(userId).select('-password');
+
+    console.log("CurrentUser: ", currentUser);
     if (!currentUser) return;
 
     currentUser.isOnline = true;
@@ -165,9 +169,22 @@ io.on('connection', async (sk) => {
         }
     });
 
-    sk.on(socketEvent.JOIN_ROOM, async ({ roomId }) => {
+    sk.on(socketEvent.JOIN_ROOM, async ({ roomId, userId }) => {
         if (!chatRooms[roomId]) {
             chatRooms[roomId] = new Set();  
+        }
+
+        // Add user id vào roomid
+        for (let [id, socket] of io.of('/').sockets) {
+            const user = socket.handshake.auth.user;
+
+            if (user && user.id === userId) {
+                if (!chatRooms[roomId].has(socket.id)) {
+                    chatRooms[roomId].add(socket.id);
+                }
+
+                socket.join(roomId);
+            }
         }
 
         log('JOIN ROOM', roomId);
