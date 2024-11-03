@@ -73,15 +73,10 @@ io.on('connection', async (sk) => {
     if (!sk.handshake.auth.user) return;
 
     let userId = sk.handshake.auth.user?.id;
-
-    console.log("UserId: ", userId);
     if (!userId) return;
 
     const currentUser = await User.findById(userId).select('-password');
-
-    console.log("CurrentUser: ", currentUser);
     if (!currentUser) return;
-
     currentUser.isOnline = true;
     await currentUser.save();
 
@@ -147,8 +142,8 @@ io.on('connection', async (sk) => {
         for (let [id, socket] of io.of('/').sockets) {
             const userSocket = socket.handshake.auth.user;
 
-            if (userSocket && userSocket.id === request.receiver) {
-                io.to(id).emit('receive-notification', {
+            if (userSocket && userSocket.id === request.receiver._id) {
+                io.to(id).emit(socketEvent.RECEIVE_NOTIFICATION, {
                     notification: request,
                 });
             }
