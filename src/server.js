@@ -1,9 +1,9 @@
 import cors from 'cors';
 import dotenv from 'dotenv';
 import express from 'express';
-import { createServer } from 'http';
+import {createServer} from 'http';
 import mongoose from 'mongoose';
-import { Server } from 'socket.io';
+import {Server} from 'socket.io';
 import Conversation from './models/Conversation.js';
 import Message from './models/Message.js';
 import Participant from './models/Participant.js';
@@ -224,12 +224,10 @@ io.on('connection', async (sk) => {
         sk.leave(roomId);
     });
 
-    sk.on(socketEvent.SEND_MESSAGE, (message) => {
+    sk.on(socketEvent.SEND_MESSAGE, ({message, roomId}) => {
         log('SEND MESSAGE');
-        const { conversation } = message;
-        const conversationId = conversation._id;
 
-        io.to(conversationId).emit(socketEvent.RECEIVE_MESSAGE, message);
+        io.to(roomId).emit(socketEvent.RECEIVE_MESSAGE, message);
     });
 
     sk.on(
