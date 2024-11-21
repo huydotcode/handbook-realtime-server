@@ -165,6 +165,9 @@ io.on('connection', async (sk) => {
     });
 
     sk.on(socketEvent.JOIN_ROOM, async ({ roomId, userId }) => {
+        console.log({
+            roomId, userId
+        })
         if (!chatRooms[roomId]) {
             chatRooms[roomId] = new Set();  
         }
