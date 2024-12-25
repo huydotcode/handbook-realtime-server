@@ -1,9 +1,9 @@
 import cors from 'cors';
 import dotenv from 'dotenv';
 import express from 'express';
-import {createServer} from 'http';
+import { createServer } from 'http';
 import mongoose from 'mongoose';
-import {Server} from 'socket.io';
+import { Server } from 'socket.io';
 import Conversation from './models/Conversation.js';
 import Message from './models/Message.js';
 import Participant from './models/Participant.js';
@@ -90,36 +90,20 @@ io.on('connection', async (sk) => {
         }
     }
 
-    /*
-        1. A gửi lời mời kết bạn cho B
-        1.1. Kiểm tra xem đã là bạn bè chưa
-        1.2. Kiểm tra xem đã có lời mời kết bạn chưa
-        1.3. Tạo lời mời kết bạn
-        1.4. Gửi lời mời kết bạn cho B
-        2. B nhận được lời mời kết bạn từ A
-        2.1. Xóa lời mời kết bạn
-        2.2. Thêm A vào danh sách bạn bè
-        2.3. Thêm B vào danh sách bạn bè của A
-        2.4. Gửi thông báo cho A
-        3. A nhận được thông báo từ B
-        3.1. Thêm B vào danh sách bạn bè
-        3.2. Gửi thông báo cho B
-    */
-
     // Tham gia các cuộc hội thoại
     const participantsOfUser = await Participant.find({
-        user: currentUser._id
-    })
+        user: currentUser._id,
+    });
 
     const conversations = await Conversation.find({
         participants: {
-            $in: participantsOfUser.map(par => par._id)
-        }
-    })
+            $in: participantsOfUser.map((par) => par._id),
+        },
+    });
 
     const joinRoom = (conversationId) => {
         if (!chatRooms[conversationId]) {
-            chatRooms[conversationId] = new Set();  
+            chatRooms[conversationId] = new Set();
         }
 
         log('JOIN ROOM', conversationId.toString());
@@ -128,8 +112,8 @@ io.on('connection', async (sk) => {
             chatRooms[conversationId].add(sk.id);
         }
 
-        sk.join(conversationId);        
-    }
+        sk.join(conversationId);
+    };
 
     for (const conversation of conversations) {
         joinRoom(conversation._id);
@@ -166,14 +150,15 @@ io.on('connection', async (sk) => {
 
     sk.on(socketEvent.JOIN_ROOM, async ({ roomId, userId }) => {
         console.log({
-            roomId, userId
-        })
+            roomId,
+            userId,
+        });
         if (!chatRooms[roomId]) {
-            chatRooms[roomId] = new Set();  
+            chatRooms[roomId] = new Set();
         }
 
         // Add user id vào roomid
-        for (let [id, socket] of io.of('/').sockets) {
+        for (let [_, socket] of io.of('/').sockets) {
             const user = socket.handshake.auth.user;
 
             if (user && user.id === userId) {
@@ -224,7 +209,7 @@ io.on('connection', async (sk) => {
         sk.leave(roomId);
     });
 
-    sk.on(socketEvent.SEND_MESSAGE, ({message, roomId}) => {
+    sk.on(socketEvent.SEND_MESSAGE, ({ message, roomId }) => {
         log('SEND MESSAGE');
 
         io.to(roomId).emit(socketEvent.RECEIVE_MESSAGE, message);
