@@ -2,12 +2,14 @@ import { Schema, model } from 'mongoose';
 
 const MessageSchema = new Schema(
     {
-        senderId: {
+        sender: {
             type: Schema.Types.ObjectId,
+            ref: 'User',
             required: true,
         },
         conversation: {
-            type: String,
+            type: Schema.Types.ObjectId,
+            ref: 'Conversation',
             required: true,
         },
         text: {
@@ -15,6 +17,7 @@ const MessageSchema = new Schema(
         },
         images: {
             type: [Schema.Types.ObjectId],
+            ref: 'Image',
             default: [],
         },
         isRead: {

@@ -6,7 +6,6 @@ import mongoose from 'mongoose';
 import { Server } from 'socket.io';
 import Conversation from './models/Conversation.js';
 import Message from './models/Message.js';
-import Participant from './models/Participant.js';
 import User from './models/User.js';
 
 const app = express();
@@ -90,14 +89,9 @@ io.on('connection', async (sk) => {
         }
     }
 
-    // Tham gia các cuộc hội thoại
-    const participantsOfUser = await Participant.find({
-        user: currentUser._id,
-    });
-
     const conversations = await Conversation.find({
         participants: {
-            $in: participantsOfUser.map((par) => par._id),
+            $elemMatch: { $eq: userId },
         },
     });
 
@@ -106,7 +100,7 @@ io.on('connection', async (sk) => {
             chatRooms[conversationId] = new Set();
         }
 
-        log('JOIN ROOM', conversationId.toString());
+        log(`${currentUser.name} JOIN ROOM: ${conversationId}`);
 
         if (!chatRooms[conversationId].has(sk.id)) {
             chatRooms[conversationId].add(sk.id);
@@ -120,7 +114,15 @@ io.on('connection', async (sk) => {
     }
 
     sk.on(socketEvent.SEND_REQUEST_ADD_FRIEND, async ({ request }) => {
-        log('SEND REQUEST ADD FRIEND');
+        if (!request) {
+            console.log('REQUEST IS NULL');
+            return;
+        }
+
+        log('SEND REQUEST ADD FRIEND', {
+            sendName: request.sender.name,
+            receiveName: request.receiver.name,
+        });
 
         // Gửi lời mời kết bạn cho B
         for (let [id, socket] of io.of('/').sockets) {
@@ -135,13 +137,21 @@ io.on('connection', async (sk) => {
     });
 
     sk.on(socketEvent.RECEIVE_NOTIFICATION, async ({ notification }) => {
-        log('RECEIVE NOTIFICATION');
+        if (!notification) {
+            console.log('NOTIFICATION IS NULL');
+            return;
+        }
+
+        log('RECEIVE NOTIFICATION', {
+            sendName: notification.sender.name,
+            receiveName: notification.receiver,
+        });
 
         for (let [id, socket] of io.of('/').sockets) {
             const user = socket.handshake.auth.user;
 
-            if (user && user.id === notification.receiver) {
-                io.to(id).emit('receive-notification', {
+            if (user && user.id === notification.receiver._id) {
+                io.to(id).emit(socketEvent.RECEIVE_NOTIFICATION, {
                     notification,
                 });
             }
@@ -149,10 +159,13 @@ io.on('connection', async (sk) => {
     });
 
     sk.on(socketEvent.JOIN_ROOM, async ({ roomId, userId }) => {
-        console.log({
-            roomId,
-            userId,
-        });
+        if (!roomId || !userId) {
+            console.log('ROOM ID OR USER ID IS NULL');
+            return;
+        }
+
+        log(`${userId} JOIN ROOM: ${roomId}`);
+
         if (!chatRooms[roomId]) {
             chatRooms[roomId] = new Set();
         }
@@ -170,8 +183,6 @@ io.on('connection', async (sk) => {
             }
         }
 
-        log('JOIN ROOM', roomId);
-
         if (!chatRooms[roomId].has(sk.id)) {
             chatRooms[roomId].add(sk.id);
         }
@@ -179,21 +190,37 @@ io.on('connection', async (sk) => {
         sk.join(roomId);
     });
 
-    sk.on(socketEvent.READ_MESSAGE, async ({ roomId }) => {
+    sk.on(socketEvent.READ_MESSAGE, async ({ roomId, userId }) => {
+        if (!roomId || !userId) {
+            console.log('ROOM ID OR USER ID IS NULL');
+            return;
+        }
+
         log('READ MESSAGE', roomId);
+
         await Message.updateMany(
-            { roomId, userId: { $ne: userId } },
-            { isRead: true }
+            { conversation: roomId, isRead: false },
+            {
+                $set: {
+                    isRead: true,
+                },
+            }
         );
 
         sk.to(roomId).emit(socketEvent.READ_MESSAGE, {
             roomId,
-            userId: userId,
+            userId,
         });
     });
 
     sk.on(socketEvent.GET_LAST_MESSAGE, async ({ roomId }) => {
+        if (!roomId) {
+            console.log('ROOM ID IS NULL');
+            return;
+        }
+
         log('GET LAST MESSAGES', roomId);
+
         const lastMsg = await Message.find({ roomId })
             .sort({ createdAt: -1 })
             .limit(1);
@@ -205,27 +232,49 @@ io.on('connection', async (sk) => {
     });
 
     sk.on(socketEvent.LEAVE_ROOM, ({ roomId }) => {
+        if (!roomId) {
+            console.log('ROOM ID IS NULL');
+            return;
+        }
+
         log('LEAVE ROOM', roomId);
         sk.leave(roomId);
     });
 
     sk.on(socketEvent.SEND_MESSAGE, ({ message, roomId }) => {
-        log('SEND MESSAGE');
+        if (!message || !roomId) {
+            console.log('MESSAGE OR ROOM ID IS NULL');
+            return;
+        }
+
+        log(
+            `${message.sender.name} SEND MESSAGE TO ROOM ${roomId} - TEXT: ${message.text}`
+        );
+
+        // Kiểm tra user đã join room chưa
+        if (!chatRooms[roomId]) {
+            console.log("CREATE NEW ROOM'S SET");
+            chatRooms[roomId] = new Set();
+        }
+
+        // Add user id vào roomid
+        if (!chatRooms[roomId].has(sk.id)) {
+            console.log("ADD USER'S SOCKET ID TO ROOM");
+            chatRooms[roomId].add(sk.id);
+            sk.join(roomId);
+        }
 
         io.to(roomId).emit(socketEvent.RECEIVE_MESSAGE, message);
     });
 
-    sk.on(
-        socketEvent.DELETE_MESSAGE,
-        ({ prevMessage: prevMsg, currentMessage: msg }) => {
-            log('DELETE MESSAGE');
+    sk.on(socketEvent.DELETE_MESSAGE, ({ message }) => {
+        log(`${message.sender.name} DELETE MESSAGE ${message._id}`);
 
-            io.to(msg.conversation).emit(socketEvent.DELETE_MESSAGE, {
-                prevMsg,
-                msg,
-            });
-        }
-    );
+        io.to(message.conversation._id).emit(
+            socketEvent.DELETE_MESSAGE,
+            message
+        );
+    });
 
     sk.on('disconnect', async () => {
         log('A CLIENT DISCONNECTED', sk.id);
