@@ -31,6 +31,10 @@ const UserSchema = new Schema(
             type: Boolean,
             default: false,
         },
+        isVerified: {
+            type: Boolean,
+            default: false,
+        },
         password: String,
         givenName: String,
         familyName: String,
