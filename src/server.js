@@ -7,17 +7,15 @@ import { Server } from 'socket.io';
 import Conversation from './models/Conversation.js';
 import Message from './models/Message.js';
 import User from './models/User.js';
+import Notification from './models/Notification.js';
 
 const app = express();
 const httpServer = createServer(app);
 const PORT = 5000;
 
-// fix CORS error
 const io = new Server(httpServer, {
     cors: {
-        origin: ['http://localhost:3000', 'https://handbookk.vercel.app'],
-        methods: ['GET', 'POST'],
-        allowedHeaders: ['my-custom-header'],
+        origin: [process.env.CLIENT_HOST, 'http://localhost:3000'],
         credentials: true,
     },
 });
@@ -31,6 +29,9 @@ const socketEvent = {
     // NOTIFICATION
     RECEIVE_NOTIFICATION: 'receive-notification',
 
+    // POST
+    LIKE_POST: 'like-post',
+
     // Message
     JOIN_ROOM: 'join-room',
     READ_MESSAGE: 'read-message',
@@ -40,11 +41,8 @@ const socketEvent = {
     LEAVE_ROOM: 'leave-room',
 };
 
-// @ts-ignore
 app.use(express.json({ limit: '5mb' }));
-// @ts-ignore
 app.use(express.urlencoded({ extended: true }));
-// @ts-ignore
 app.use(
     cors({
         origin: [process.env.CLIENT_HOST, 'http://localhost:3000'],
@@ -274,6 +272,39 @@ io.on('connection', async (sk) => {
             socketEvent.DELETE_MESSAGE,
             message
         );
+    });
+
+    sk.on(socketEvent.LIKE_POST, async ({ postId, authorId }) => {
+        log(`LIKE POST ${postId} - AUTHOR: ${authorId}`);
+
+        try {
+            const existNotification = await Notification.findOne({
+                type: 'like-post',
+                sender: userId,
+                receiver: authorId,
+            });
+
+            if (existNotification) return;
+
+            const newNotification = await Notification.create({
+                type: 'like-post',
+                sender: userId,
+                receiver: authorId,
+                message: 'đã thích bài viết của bạn',
+            });
+
+            for (let [id, socket] of io.of('/').sockets) {
+                const user = socket.handshake.auth.user;
+
+                if (user && user.id === authorId) {
+                    io.to(id).emit(socketEvent.RECEIVE_NOTIFICATION, {
+                        notification: newNotification,
+                    });
+                }
+            }
+        } catch (error) {
+            console.log(error);
+        }
     });
 
     sk.on('disconnect', async () => {
