@@ -63,6 +63,7 @@ function log(event, data) {
 }
 
 const chatRooms = {};
+const userSockets = new Map();
 
 io.on('connection', async (sk) => {
     log('A CLIENT CONNECTED', sk.id);
@@ -72,6 +73,11 @@ io.on('connection', async (sk) => {
     let userId = sk.handshake.auth.user?.id;
     if (!userId) return;
 
+    if (!userSockets.has(userId)) {
+        userSockets.set(userId, new Set());
+    }
+    userSockets.get(userId).add(sk.id);
+
     const currentUser = await User.findById(userId).select('-password');
     if (!currentUser) return;
     currentUser.isOnline = true;
@@ -79,13 +85,13 @@ io.on('connection', async (sk) => {
 
     const friends = currentUser.friends;
 
-    for (let [id, socket] of io.of('/').sockets) {
-        const user = socket.handshake.auth.user;
-
-        if (user && friends.includes(user.id) && user.id !== userId) {
-            io.to(id).emit('friend-online', userId);
+    friends.forEach((friendId) => {
+        if (userSockets.has(friendId)) {
+            userSockets.get(friendId).forEach((socketId) => {
+                io.to(socketId).emit('friend-online', userId);
+            });
         }
-    }
+    });
 
     const conversations = await Conversation.find({
         participants: {
@@ -316,6 +322,13 @@ io.on('connection', async (sk) => {
 
         sk.broadcast.emit('user-disconnected', userId);
 
+        if (userSockets.has(userId)) {
+            userSockets.get(userId).delete(sk.id);
+            if (userSockets.get(userId).size === 0) {
+                userSockets.delete(userId);
+            }
+        }
+
         for (const roomId in chatRooms) {
             if (chatRooms[roomId].has(sk.id)) {
                 chatRooms[roomId].delete(sk.id);
@@ -328,10 +341,16 @@ app.get('/', (req, res) => {
     res.send('Hello everyone change 2!');
 });
 
-mongoose.connect(process.env.MONGODB_URI).then(() => {
-    console.log('Connected to DB');
+mongoose
+    .connect(process.env.MONGODB_URI)
+    .then(() => {
+        console.log('Connected to DB');
 
-    httpServer.listen(PORT, () => {
-        console.log(`Server is running on port ${PORT}`);
+        httpServer.listen(PORT, () => {
+            console.log(`Server is running on port ${PORT}`);
+        });
+    })
+    .catch((error) => {
+        console.log('Failed to connect to DB:', error);
+        process.exit(1);
     });
-});
