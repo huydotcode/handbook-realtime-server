@@ -24,6 +24,10 @@ const MessageSchema = new Schema(
             type: Boolean,
             default: false,
         },
+        isPin: {
+            type: Boolean,
+            default: false,
+        },
     },
     {
         timestamps: true,

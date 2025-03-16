@@ -22,6 +22,12 @@ const ConversationModel = new Schema(
             required: false,
             default: null,
         },
+        pinnedMessages: {
+            type: [Schema.Types.ObjectId],
+            ref: 'Message',
+            required: false,
+            default: [],
+        },
         status: { type: String, default: 'active' },
     },
     { timestamps: true }

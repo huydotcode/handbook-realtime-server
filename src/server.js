@@ -8,6 +8,7 @@ import Conversation from './models/Conversation.js';
 import Message from './models/Message.js';
 import User from './models/User.js';
 import Notification from './models/Notification.js';
+import { authMiddleware } from './middlwares/auth.middleware.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -38,6 +39,7 @@ const socketEvent = {
     SEND_MESSAGE: 'send-message',
     RECEIVE_MESSAGE: 'receive-message',
     DELETE_MESSAGE: 'delete-message',
+    PIN_MESSAGE: 'pin-message',
     LEAVE_ROOM: 'leave-room',
 };
 
@@ -64,6 +66,8 @@ function log(event, data) {
 
 const chatRooms = {};
 const userSockets = new Map();
+
+io.use(authMiddleware);
 
 io.on('connection', async (sk) => {
     log('A CLIENT CONNECTED', sk.id);
@@ -168,7 +172,7 @@ io.on('connection', async (sk) => {
             return;
         }
 
-        log(`${userId} JOIN ROOM: ${roomId}`);
+        log(`USERID: ${userId} JOIN ROOM: ${roomId}`);
 
         if (!chatRooms[roomId]) {
             chatRooms[roomId] = new Set();
@@ -269,6 +273,12 @@ io.on('connection', async (sk) => {
         }
 
         io.to(roomId).emit(socketEvent.RECEIVE_MESSAGE, message);
+    });
+
+    sk.on(socketEvent.PIN_MESSAGE, ({ message }) => {
+        log(`${message.sender.name} PIN MESSAGE ${message._id}`);
+
+        io.to(message.conversation._id).emit(socketEvent.PIN_MESSAGE, message);
     });
 
     sk.on(socketEvent.DELETE_MESSAGE, ({ message }) => {
