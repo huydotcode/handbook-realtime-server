@@ -15,9 +15,9 @@ const MessageSchema = new Schema(
         text: {
             type: String,
         },
-        images: {
+        media: {
             type: [Schema.Types.ObjectId],
-            ref: 'Image',
+            ref: 'Media',
             default: [],
         },
         isRead: {
