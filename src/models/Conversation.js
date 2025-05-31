@@ -28,6 +28,12 @@ const ConversationModel = new Schema(
             required: false,
             default: [],
         },
+        isDeletedBy: {
+            type: [Schema.Types.ObjectId],
+            ref: 'User',
+            required: false,
+            default: [],
+        },
         status: { type: String, default: 'active' },
     },
     { timestamps: true }
