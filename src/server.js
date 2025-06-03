@@ -40,6 +40,7 @@ const socketEvent = {
     RECEIVE_MESSAGE: 'receive-message',
     DELETE_MESSAGE: 'delete-message',
     PIN_MESSAGE: 'pin-message',
+    UN_PIN_MESSAGE: 'un-pin-message',
     LEAVE_ROOM: 'leave-room',
 };
 
@@ -279,6 +280,14 @@ io.on('connection', async (sk) => {
         log(`${message.sender.name} PIN MESSAGE ${message._id}`);
 
         io.to(message.conversation._id).emit(socketEvent.PIN_MESSAGE, message);
+    });
+
+    sk.on(socketEvent.UN_PIN_MESSAGE, ({ message }) => {
+        log(`${message.sender.name} UN PIN MESSAGE ${message._id}`);
+        io.to(message.conversation._id).emit(
+            socketEvent.UN_PIN_MESSAGE,
+            message
+        );
     });
 
     sk.on(socketEvent.DELETE_MESSAGE, ({ message }) => {
