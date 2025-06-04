@@ -208,10 +208,19 @@ io.on('connection', async (sk) => {
         log('READ MESSAGE', roomId);
 
         await Message.updateMany(
-            { conversation: roomId, isRead: false },
             {
-                $set: {
-                    isRead: true,
+                conversation: roomId,
+                // isRead: false,
+                readBy: { $not: { $elemMatch: { user: userId } } },
+            },
+            {
+                // $set: {
+                //     isRead: true,
+                // },
+                $push: {
+                    readBy: {
+                        user: userId,
+                    },
                 },
             }
         );

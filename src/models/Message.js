@@ -20,14 +20,22 @@ const MessageSchema = new Schema(
             ref: 'Media',
             default: [],
         },
-        isRead: {
-            type: Boolean,
-            default: false,
-        },
         isPin: {
             type: Boolean,
             default: false,
         },
+        readBy: [
+            {
+                user: {
+                    type: Schema.Types.ObjectId,
+                    ref: 'User',
+                },
+                readAt: {
+                    type: Date,
+                    default: Date.now,
+                },
+            },
+        ],
     },
     {
         timestamps: true,
