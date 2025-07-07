@@ -4,11 +4,11 @@ import express from 'express';
 import { createServer } from 'http';
 import mongoose from 'mongoose';
 import { Server } from 'socket.io';
-import Conversation from './models/Conversation.js';
-import Message from './models/Message.js';
-import User from './models/User.js';
-import Notification from './models/Notification.js';
-import { authMiddleware } from './middlwares/auth.middleware.js';
+import Conversation from './models/Conversation';
+import Message from './models/Message';
+import User from './models/User';
+import Notification from './models/Notification';
+import { authMiddleware } from './middlwares/auth.middleware';
 
 const app = express();
 const httpServer = createServer(app);
@@ -16,7 +16,10 @@ const PORT = 5000;
 
 const io = new Server(httpServer, {
     cors: {
-        origin: [process.env.CLIENT_HOST, 'http://localhost:3000'],
+        origin: [
+            process.env.CLIENT_HOST || 'http://localhost:3000',
+            'http://localhost:3000',
+        ],
         credentials: true,
     },
 });
@@ -33,28 +36,33 @@ const socketEvent = {
     // POST
     LIKE_POST: 'like-post',
 
-    // Message
+    // MESSAGE
     JOIN_ROOM: 'join-room',
-    READ_MESSAGE: 'read-message',
+    LEAVE_ROOM: 'leave-room',
     SEND_MESSAGE: 'send-message',
     RECEIVE_MESSAGE: 'receive-message',
+    READ_MESSAGE: 'read-message',
     DELETE_MESSAGE: 'delete-message',
     PIN_MESSAGE: 'pin-message',
     UN_PIN_MESSAGE: 'un-pin-message',
-    LEAVE_ROOM: 'leave-room',
-};
+    GET_LAST_MESSAGE: 'get-last-message',
+} as const;
 
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(
     cors({
-        origin: [process.env.CLIENT_HOST, 'http://localhost:3000'],
+        origin: [
+            process.env.CLIENT_HOST || 'http://localhost:3000',
+            'http://localhost:3000',
+        ],
+        credentials: true,
     })
 );
 
 dotenv.config();
 
-function log(event, data) {
+function log(event: string, data?: any) {
     console.log(
         `\n[${new Date().toLocaleTimeString()}] ${event.toUpperCase()}:`
     );
@@ -65,8 +73,14 @@ function log(event, data) {
     console.log('====================================');
 }
 
-const chatRooms = {};
-const userSockets = new Map();
+const chatRooms: Record<string, Set<string>> = {};
+
+interface UserSocket {
+    userId: string;
+    socketId: string;
+}
+
+const userSockets = new Map<string, Set<string>>();
 
 io.use(authMiddleware);
 
@@ -81,7 +95,8 @@ io.on('connection', async (sk) => {
     if (!userSockets.has(userId)) {
         userSockets.set(userId, new Set());
     }
-    userSockets.get(userId).add(sk.id);
+
+    userSockets.get(userId)!.add(sk.id);
 
     const currentUser = await User.findById(userId).select('-password');
     if (!currentUser) return;
@@ -91,10 +106,16 @@ io.on('connection', async (sk) => {
     const friends = currentUser.friends;
 
     friends.forEach((friendId) => {
-        if (userSockets.has(friendId)) {
-            userSockets.get(friendId).forEach((socketId) => {
-                io.to(socketId).emit('friend-online', userId);
-            });
+        if (friendId) {
+            const friendIdStr = friendId.toString();
+            if (userSockets.has(friendIdStr)) {
+                const friendSockets = userSockets.get(friendIdStr);
+                if (friendSockets) {
+                    friendSockets.forEach((socketId) => {
+                        io.to(socketId).emit('friend-online', userId);
+                    });
+                }
+            }
         }
     });
 
@@ -104,7 +125,7 @@ io.on('connection', async (sk) => {
         },
     });
 
-    const joinRoom = (conversationId) => {
+    const joinRoom = (conversationId: string) => {
         if (!chatRooms[conversationId]) {
             chatRooms[conversationId] = new Set();
         }
@@ -119,7 +140,7 @@ io.on('connection', async (sk) => {
     };
 
     for (const conversation of conversations) {
-        joinRoom(conversation._id);
+        joinRoom(conversation._id.toString());
     }
 
     sk.on(socketEvent.SEND_REQUEST_ADD_FRIEND, async ({ request }) => {
@@ -288,12 +309,15 @@ io.on('connection', async (sk) => {
     sk.on(socketEvent.PIN_MESSAGE, ({ message }) => {
         log(`${message.sender.name} PIN MESSAGE ${message._id}`);
 
-        io.to(message.conversation._id).emit(socketEvent.PIN_MESSAGE, message);
+        io.to(message.conversation._id.toString()).emit(
+            socketEvent.PIN_MESSAGE,
+            message
+        );
     });
 
     sk.on(socketEvent.UN_PIN_MESSAGE, ({ message }) => {
         log(`${message.sender.name} UN PIN MESSAGE ${message._id}`);
-        io.to(message.conversation._id).emit(
+        io.to(message.conversation._id.toString()).emit(
             socketEvent.UN_PIN_MESSAGE,
             message
         );
@@ -302,7 +326,7 @@ io.on('connection', async (sk) => {
     sk.on(socketEvent.DELETE_MESSAGE, ({ message }) => {
         log(`${message.sender.name} DELETE MESSAGE ${message._id}`);
 
-        io.to(message.conversation._id).emit(
+        io.to(message.conversation._id.toString()).emit(
             socketEvent.DELETE_MESSAGE,
             message
         );
@@ -351,9 +375,12 @@ io.on('connection', async (sk) => {
         sk.broadcast.emit('user-disconnected', userId);
 
         if (userSockets.has(userId)) {
-            userSockets.get(userId).delete(sk.id);
-            if (userSockets.get(userId).size === 0) {
-                userSockets.delete(userId);
+            const socketSet = userSockets.get(userId);
+            if (socketSet) {
+                socketSet.delete(sk.id);
+                if (socketSet.size === 0) {
+                    userSockets.delete(userId);
+                }
             }
         }
 
@@ -370,7 +397,7 @@ app.get('/', (req, res) => {
 });
 
 mongoose
-    .connect(process.env.MONGODB_URI)
+    .connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/defaultdb')
     .then(() => {
         console.log('Connected to DB');
 
