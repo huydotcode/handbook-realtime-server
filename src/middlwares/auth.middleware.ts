@@ -1,4 +1,3 @@
-import { NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { Socket } from 'socket.io';
 import { ExtendedError } from 'socket.io/dist/namespace';
