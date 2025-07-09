@@ -1,6 +1,36 @@
-import { Schema, model } from 'mongoose';
+import bcrypt from 'bcrypt';
+import {
+    Schema,
+    Types,
+    deleteModel,
+    model,
+    modelNames,
+    models,
+} from 'mongoose';
+import { UserRole } from '../enums/UserRole';
 
-const UserSchema = new Schema(
+interface IUserModel {
+    isModified(arg0: string): unknown;
+    name: string;
+    username: string;
+    email: string;
+    avatar: string;
+    password: string;
+    role: UserRole;
+    givenName: string;
+    familyName: string;
+    locale: string;
+    friends: Types.ObjectId[];
+    groups: Types.ObjectId[];
+    followersCount: number;
+    isOnline: boolean;
+    isBlocked: boolean;
+    isVerified: boolean;
+    lastAccessed: Date;
+    comparePassword(arg0: string): Promise<boolean>;
+}
+
+const UserSchema = new Schema<IUserModel>(
     {
         email: {
             type: String,
@@ -21,7 +51,8 @@ const UserSchema = new Schema(
         },
         role: {
             type: String,
-            default: 'user',
+            enum: Object.values(UserRole),
+            default: UserRole.USER,
         },
         isOnline: {
             type: Boolean,
@@ -40,7 +71,11 @@ const UserSchema = new Schema(
         familyName: String,
         locale: String,
         friends: [{ type: Schema.Types.ObjectId, ref: 'User' }],
-        followers: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+        groups: [{ type: Schema.Types.ObjectId, ref: 'Group' }],
+        followersCount: {
+            type: Number,
+            default: 0,
+        },
         lastAccessed: {
             type: Date,
             default: Date.now(),
@@ -51,6 +86,29 @@ const UserSchema = new Schema(
     }
 );
 
-const User = model('User', UserSchema);
+// Index text with username and name
+UserSchema.index({ username: 'text', name: 'text' });
+
+if (modelNames && modelNames().includes('User')) {
+    deleteModel('User');
+}
+
+UserSchema.methods.comparePassword = async function (password: string) {
+    const user = this as IUserModel;
+    if (user.password === undefined) {
+        return false;
+    }
+    return bcrypt.compare(password, user.password!);
+};
+
+UserSchema.pre('save', async function (next) {
+    const user = this as IUserModel;
+    if (user.isModified('password')) {
+        user.password = user.password;
+    }
+    next();
+});
+
+const User = models.User || model<IUserModel>('User', UserSchema);
 
 export default User;

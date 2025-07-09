@@ -26,6 +26,7 @@ const io = new Server(httpServer, {
 
 const socketEvent = {
     // FRIEND REQUEST
+    SEND_NOTIFICATION: 'send-notification',
     SEND_REQUEST_ADD_FRIEND: 'send-request-add-friend',
     ACCEPT_FRIEND: 'accept-friend',
     UN_FRIEND: 'un-friend',
@@ -105,7 +106,7 @@ io.on('connection', async (sk) => {
 
     const friends = currentUser.friends;
 
-    friends.forEach((friendId) => {
+    friends.forEach((friendId: string | undefined) => {
         if (friendId) {
             const friendIdStr = friendId.toString();
             if (userSockets.has(friendIdStr)) {
@@ -161,6 +162,28 @@ io.on('connection', async (sk) => {
             if (userSocket && userSocket.id === request.receiver._id) {
                 io.to(id).emit(socketEvent.RECEIVE_NOTIFICATION, {
                     notification: request,
+                });
+            }
+        }
+    });
+
+    sk.on(socketEvent.SEND_NOTIFICATION, async ({ notification }) => {
+        if (!notification) {
+            console.log('NOTIFICATION IS NULL');
+            return;
+        }
+
+        log('SEND NOTIFICATION', {
+            sendName: notification.sender.name,
+            receiveName: notification.receiver.name,
+        });
+
+        // Gửi notification cho người nhận
+        for (let [id, socket] of io.of('/').sockets) {
+            const user = socket.handshake.auth.user;
+            if (user && user.id === notification.receiver._id) {
+                io.to(id).emit(socketEvent.RECEIVE_NOTIFICATION, {
+                    notification,
                 });
             }
         }
