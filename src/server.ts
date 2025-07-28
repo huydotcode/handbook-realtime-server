@@ -256,11 +256,11 @@ io.on('connection', async (sk) => {
                 conversation: roomId,
                 // isRead: false,
                 readBy: { $not: { $elemMatch: { user: userId } } },
+                sender: {
+                    $ne: userId,
+                },
             },
             {
-                // $set: {
-                //     isRead: true,
-                // },
                 $push: {
                     readBy: {
                         user: userId,
