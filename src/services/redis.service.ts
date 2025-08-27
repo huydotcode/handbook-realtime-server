@@ -1,11 +1,15 @@
-import Redis from 'ioredis';
+import Redis, { Redis as RedisClient } from 'ioredis';
 import { config } from '../config/config';
 
 class RedisService {
-    private redis: Redis;
+    private redis: RedisClient;
 
     constructor() {
-        this.redis = new Redis(config.redisUrl);
+        this.redis = new RedisClient({
+            host: config.redis.host,
+            port: Number(config.redis.port),
+            password: config.redis.password,
+        });
         this.setupEventHandlers();
     }
 
