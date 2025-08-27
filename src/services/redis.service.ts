@@ -5,11 +5,15 @@ class RedisService {
     private redis: RedisClient;
 
     constructor() {
-        this.redis = new RedisClient({
-            host: config.redis.host,
-            port: Number(config.redis.port),
-            password: config.redis.password,
-        });
+        const redisUrl = config.redisUrl;
+
+        console.log('REDIS URL: ', redisUrl);
+
+        if (!redisUrl) {
+            throw new Error('REDIS_URL is not defined');
+        }
+
+        this.redis = new Redis(redisUrl);
         this.setupEventHandlers();
     }
 
