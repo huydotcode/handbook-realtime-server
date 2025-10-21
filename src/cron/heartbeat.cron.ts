@@ -4,14 +4,15 @@ import { log } from '../utils/logger';
 
 const HEARTBEAT_SCHEDULE = {
     EVERY_ONE_MINUTE: '*/1 * * * *',
+    EVERY_FIVE_MINUTES: '*/5 * * * *',
     EVERY_SECOND: '* * * * * *',
 };
 
 export function heartbeatCron() {
-    cron.schedule(HEARTBEAT_SCHEDULE.EVERY_SECOND, async () => {
+    cron.schedule(HEARTBEAT_SCHEDULE.EVERY_FIVE_MINUTES, async () => {
         log('HEARTBEAT CRON');
         const now = Date.now();
-        const timeout = 60 * 1000; // 1 phút
+        const timeout = 60 * 1000;
 
         await User.updateMany(
             { lastAccessed: { $lt: new Date(now - timeout) } },
