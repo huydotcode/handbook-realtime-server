@@ -1,8 +1,7 @@
 import { Socket } from 'socket.io';
-import { socketEvent } from '../../constants/socketEvents';
+import Notification from '../../models/Notification';
 import { SocketUtils } from '../../utils/socket.utils';
 import { BaseSocketHandler } from './base.handler';
-import Notification from '../../models/Notification';
 
 export class PostSocketHandler extends BaseSocketHandler {
     async handle(socket: Socket, io: any, data?: any): Promise<void> {

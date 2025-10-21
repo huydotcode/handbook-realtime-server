@@ -1,6 +1,7 @@
 import { Socket } from 'socket.io';
+import { socketEvent } from 'src/constants/socketEvents';
+import { chatService, userService } from '../services';
 import { log } from '../utils/logger';
-import { userService, chatService } from '../services';
 import { SocketHandlerManager } from './handler.manager';
 
 export class SocketManager {
@@ -35,10 +36,14 @@ export class SocketManager {
             const handlerManager = new SocketHandlerManager(socket, io, userId);
             handlerManager.setupEventListeners(socket, io);
 
+            socket.on(socketEvent.HEARTBEAT, async () => {
+                await userService.updateUserOnlineStatus(userId, true);
+            });
+
             // Setup disconnect event
             socket.on('disconnect', async () => {
                 try {
-                    await this.handleDisconnect(socket, userId);
+                    await this.handleDisconnect(socket, userId, handlerManager);
                 } catch (error) {
                     console.error('Error handling disconnect:', error);
                 }
@@ -65,9 +70,18 @@ export class SocketManager {
         }
     }
 
-    static async handleDisconnect(socket: Socket, userId: string) {
+    static async handleDisconnect(
+        socket: Socket,
+        userId: string,
+        handlerManager?: any
+    ) {
         try {
             log('A CLIENT DISCONNECTED', socket.id);
+
+            // Handle video call disconnect first
+            if (handlerManager) {
+                await handlerManager.handleDisconnect();
+            }
 
             // Update user offline status
             await userService.updateUserOnlineStatus(userId, false);

@@ -1,8 +1,8 @@
 import { Socket } from 'socket.io';
-import { socketEvent } from '../constants/socketEvents';
-import { log } from '../utils/logger';
 import Notification from '../models/Notification';
 import { userService } from '../services';
+import { log } from '../utils/logger';
+import { socketEvent } from 'src/constants/socketEvents';
 
 export class PostHandler {
     static async handleLikePost(

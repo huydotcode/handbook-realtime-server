@@ -1,4 +1,4 @@
-import { socketEvent } from '../constants/socketEvents';
+import { socketEvent } from 'src/constants/socketEvents';
 import User from '../models/User';
 import { UserSockets } from '../types/socket';
 
@@ -50,12 +50,37 @@ class UserService {
         }
     }
 
-    async getFriends(userId: string): Promise<string[]> {
+    async getUser(userId: string): Promise<any> {
+        try {
+            if (!userId) return null;
+
+            const user = await User.findById(userId);
+
+            return user;
+        } catch (err) {
+            console.log('Error get user ', err);
+        }
+    }
+
+    async getFriendsOnline(userId: string): Promise<string[]> {
         try {
             if (!userId) return [];
 
-            const user = await User.findById(userId).select('friends');
-            return user?.friends || [];
+            const user = await User.findById(userId)
+                .select('friends')
+                .populate('friends');
+            const friends = user?.friends || [];
+
+            // Lọc ra những bạn bè đang trực tuyến
+            const onlineFriends = friends.filter((friend: any) => {
+                return friend.isOnline;
+            });
+
+            console.log('Get friends online data: ', {
+                onlineFriends,
+            });
+
+            return onlineFriends;
         } catch (error) {
             console.error('Error getting friends:', error);
             return [];
@@ -66,9 +91,12 @@ class UserService {
         try {
             if (!userId) return;
 
-            const friends = await this.getFriends(userId);
+            const user = await this.getUser(userId);
 
-            for (const friendId of friends) {
+            const friends = (await this.getFriendsOnline(userId)) as any[];
+
+            for (const friend of friends) {
+                const friendId = friend._id as string;
                 if (friendId) {
                     const friendIdStr = friendId.toString();
                     const friendSockets = this.getUserSockets(friendIdStr);
@@ -76,7 +104,7 @@ class UserService {
                         friendSockets.forEach((socketId) => {
                             io.to(socketId).emit(
                                 socketEvent.FRIEND_ONLINE,
-                                userId
+                                user
                             );
                         });
                     }

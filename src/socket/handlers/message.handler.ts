@@ -1,10 +1,10 @@
 import { Socket } from 'socket.io';
-import { socketEvent } from '../../constants/socketEvents';
-import { MessageData } from '../../types/socket';
+import { socketEvent } from 'src/constants/socketEvents';
+import Message from '../../models/Message';
 import { chatService } from '../../services/chat.service';
+import { MessageData } from '../../types/socket';
 import { SocketUtils } from '../../utils/socket.utils';
 import { BaseSocketHandler } from './base.handler';
-import Message from '../../models/Message';
 
 export class MessageSocketHandler extends BaseSocketHandler {
     async handle(socket: Socket, io: any, data?: any): Promise<void> {

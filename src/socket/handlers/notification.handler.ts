@@ -1,6 +1,5 @@
 import { Socket } from 'socket.io';
-import { socketEvent } from '../../constants/socketEvents';
-import { NotificationData, FriendRequestData } from '../../types/socket';
+import { FriendRequestData, NotificationData } from '../../types/socket';
 import { SocketUtils } from '../../utils/socket.utils';
 import { BaseSocketHandler } from './base.handler';
 
