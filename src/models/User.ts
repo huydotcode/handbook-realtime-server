@@ -7,7 +7,7 @@ import {
     modelNames,
     models,
 } from 'mongoose';
-import { UserRole } from 'src/enums/UserRole';
+import { UserRole } from '../enums/UserRole';
 
 interface IUserModel {
     isModified(arg0: string): unknown;
