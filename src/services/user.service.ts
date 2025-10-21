@@ -1,4 +1,4 @@
-import { socketEvent } from 'src/constants/socketEvents';
+import { socketEvent } from '../constants/socketEvents';
 import User from '../models/User';
 import { UserSockets } from '../types/socket';
 

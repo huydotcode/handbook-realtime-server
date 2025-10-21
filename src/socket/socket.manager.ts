@@ -1,5 +1,5 @@
 import { Socket } from 'socket.io';
-import { socketEvent } from 'src/constants/socketEvents';
+import { socketEvent } from '../constants/socketEvents';
 import { chatService, userService } from '../services';
 import { log } from '../utils/logger';
 import { SocketHandlerManager } from './handler.manager';

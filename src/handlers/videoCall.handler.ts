@@ -7,7 +7,7 @@ import type {
     RTCSessionDescriptionInit,
 } from '../types/webrtc';
 import { log } from '../utils/logger';
-import { socketEvent } from 'src/constants/socketEvents';
+import { socketEvent } from '../constants/socketEvents';
 
 export class VideoCallSocketHandler {
     constructor(

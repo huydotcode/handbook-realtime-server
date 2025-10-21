@@ -1,5 +1,5 @@
 import { Socket } from 'socket.io';
-import { socketEvent } from 'src/constants/socketEvents';
+import { socketEvent } from '../constants/socketEvents';
 import {
     MessageHandler,
     NotificationHandler,

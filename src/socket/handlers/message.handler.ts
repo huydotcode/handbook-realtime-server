@@ -1,5 +1,5 @@
 import { Socket } from 'socket.io';
-import { socketEvent } from 'src/constants/socketEvents';
+import { socketEvent } from '../constants/socketEvents';
 import Message from '../../models/Message';
 import { chatService } from '../../services/chat.service';
 import { MessageData } from '../../types/socket';
