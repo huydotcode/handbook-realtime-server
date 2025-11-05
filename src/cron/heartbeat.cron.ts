@@ -12,7 +12,7 @@ export const HEARTBEAT_SCHEDULE = {
 
 const getHeartbeatSchedule = () => {
     if (isDevelopment) {
-        return HEARTBEAT_SCHEDULE.EVERY_SECOND;
+        return HEARTBEAT_SCHEDULE.EVERY_ONE_MINUTE;
     }
     return HEARTBEAT_SCHEDULE.EVERY_FIVE_MINUTES;
 };
