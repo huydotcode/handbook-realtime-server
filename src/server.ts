@@ -20,7 +20,7 @@ app.use(cors(config.corsOptions));
 
 io.use(authMiddleware);
 
-prepare();
+prepare(io);
 
 io.on('connection', async (socket) => {
     await SocketManager.handleConnection(socket, io);

@@ -67,39 +67,11 @@ export class MessageHandler {
         io: any,
         data: { roomId: string; userId: string }
     ) {
-        if (!SocketUtils.validateSocketData(data, ['roomId', 'userId'])) {
-            console.log('ROOM ID OR USER ID IS NULL');
-            return;
-        }
-
-        const { roomId, userId } = data;
-        log('READ MESSAGE', roomId);
-
-        try {
-            await Message.updateMany(
-                {
-                    conversation: roomId,
-                    readBy: { $not: { $elemMatch: { user: userId } } },
-                    sender: {
-                        $ne: userId,
-                    },
-                },
-                {
-                    $push: {
-                        readBy: {
-                            user: userId,
-                        },
-                    },
-                }
-            );
-
-            socket.to(roomId).emit(socketEvent.READ_MESSAGE, {
-                roomId,
-                userId,
-            });
-        } catch (error) {
-            console.error('Error marking messages as read:', error);
-        }
+        // ⚠️ DEPRECATED: This handler is no longer needed
+        // Client should call HTTP API: PATCH /api/messages/:roomId/read
+        // Real-time updates will come through event subscription
+        console.warn('⚠️ DEPRECATED: handleReadMessage - Use HTTP API instead');
+        return;
     }
 
     static async handleGetLastMessage(
@@ -107,27 +79,13 @@ export class MessageHandler {
         io: any,
         data: { roomId: string }
     ) {
-        if (!SocketUtils.validateSocketData(data, ['roomId'])) {
-            console.log('ROOM ID IS NULL');
-            return;
-        }
-
-        const { roomId } = data;
-        log('GET LAST MESSAGES', roomId);
-
-        try {
-            const lastMsg = await Message.find({ conversation: roomId })
-                .sort({ createdAt: -1 })
-                .limit(1)
-                .lean();
-
-            io.to(roomId).emit(socketEvent.GET_LAST_MESSAGE, {
-                roomId,
-                data: lastMsg[0] || null,
-            });
-        } catch (error) {
-            console.error('Error getting last message:', error);
-        }
+        // ⚠️ DEPRECATED: This handler should not query DB
+        // Client should call HTTP API: GET /api/messages/conversation/:id
+        // Consider removing this handler completely
+        console.warn(
+            '⚠️ DEPRECATED: handleGetLastMessage - Use HTTP API instead'
+        );
+        return;
     }
 
     static handlePinMessage(
