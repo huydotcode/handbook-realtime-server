@@ -15,8 +15,28 @@ class RedisService {
             throw new Error('REDIS_URL is not defined');
         }
 
-        this.redis = new Redis(redisUrl);
-        this.subscriber = new Redis(redisUrl);
+        const redisOptions = {
+            // Connection pooling
+            maxRetriesPerRequest: null,
+            retryStrategy: (times: number) => {
+                const delay = Math.min(times * 50, 2000);
+                return delay;
+            },
+            reconnectOnError: (err: Error) => {
+                const targetError = 'READONLY';
+                if (err.message.includes(targetError)) {
+                    return true;
+                }
+                return false;
+            },
+            // Keep-alive settings
+            keepAlive: 30000,
+            enableReadyCheck: true,
+            enableOfflineQueue: true,
+        };
+
+        this.redis = new Redis(redisUrl, redisOptions);
+        this.subscriber = new Redis(redisUrl, redisOptions);
         this.setupEventHandlers();
     }
 
@@ -118,6 +138,25 @@ class RedisService {
         this.subscriber.unsubscribe();
         this.subscriptions.clear();
         console.log('📤 Unsubscribed from all channels');
+    }
+
+    /**
+     * Disconnect from Redis
+     */
+    async disconnect(): Promise<void> {
+        try {
+            await this.redis.quit();
+            console.log('✅ Redis client disconnected');
+        } catch (error) {
+            console.warn('Redis client disconnect warning:', error);
+        }
+
+        try {
+            await this.subscriber.quit();
+            console.log('✅ Redis subscriber disconnected');
+        } catch (error) {
+            console.warn('Redis subscriber disconnect warning:', error);
+        }
     }
 }
 
