@@ -11,56 +11,18 @@ type SubscriptionCallback = (message: string) => void;
 /**
  * Get or create singleton Redis client instance
  */
-const getRedisClient = (): RedisClient => {
-    if (global.redisClientInstance) {
-        return global.redisClientInstance;
-    }
-
-    const redisUrl = config.redisUrl;
-    if (!redisUrl) {
-        throw new Error('REDIS_URL is not defined');
-    }
-
-    const redisOptions = {
-        // Connection pooling
-        maxRetriesPerRequest: null,
-        retryStrategy: (times: number) => {
-            const delay = Math.min(times * 50, 2000);
-            return delay;
-        },
-        reconnectOnError: (err: Error) => {
-            const targetError = 'READONLY';
-            if (err.message.includes(targetError)) {
-                return true;
-            }
-            return false;
-        },
-        // Keep-alive settings
-        keepAlive: 30000,
-        enableReadyCheck: true,
-        enableOfflineQueue: true,
-    };
-
-    const client = new Redis(redisUrl, redisOptions);
-    client.on('connect', () => console.log('✅ Redis client connected'));
-    client.on('error', (err) => console.error('❌ Redis client error:', err));
-
-    global.redisClientInstance = client;
-    return client;
-};
-
 class RedisService {
-    private redis: RedisClient;
     private subscriber: RedisClient;
     private subscriptions: Map<string, Set<SubscriptionCallback>> = new Map();
 
     constructor() {
-        // Get singleton base client
-        this.redis = getRedisClient();
+        // Create dedicated subscriber client
+        const redisUrl = config.redisUrl;
+        if (!redisUrl) {
+            throw new Error('REDIS_URL is not defined');
+        }
 
-        // Use duplicate() instead of new Redis() to reuse connection pool
-        // This shares the underlying socket but has its own command queue
-        this.subscriber = this.redis.duplicate({
+        const redisOptions = {
             // Connection pooling
             maxRetriesPerRequest: null,
             retryStrategy: (times: number) => {
@@ -78,18 +40,13 @@ class RedisService {
             keepAlive: 30000,
             enableReadyCheck: true,
             enableOfflineQueue: true,
-        });
+        };
+
+        this.subscriber = new Redis(redisUrl, redisOptions);
         this.setupEventHandlers();
     }
 
     private setupEventHandlers() {
-        this.redis.on('connect', () =>
-            console.log('✅ Redis client connected')
-        );
-        this.redis.on('error', (err) =>
-            console.error('❌ Redis client error:', err)
-        );
-
         this.subscriber.on('connect', () =>
             console.log('✅ Redis subscriber connected')
         );
@@ -116,23 +73,7 @@ class RedisService {
     }
 
     getClient(): Redis {
-        return this.redis;
-    }
-
-    async set(key: string, value: string, expireTime?: number): Promise<void> {
-        if (expireTime) {
-            await this.redis.setex(key, expireTime, value);
-        } else {
-            await this.redis.set(key, value);
-        }
-    }
-
-    async get(key: string): Promise<string | null> {
-        return await this.redis.get(key);
-    }
-
-    async del(key: string): Promise<void> {
-        await this.redis.del(key);
+        return this.subscriber;
     }
 
     /**
@@ -186,13 +127,6 @@ class RedisService {
      * Disconnect from Redis
      */
     async disconnect(): Promise<void> {
-        try {
-            await this.redis.quit();
-            console.log('✅ Redis client disconnected');
-        } catch (error) {
-            console.warn('Redis client disconnect warning:', error);
-        }
-
         try {
             await this.subscriber.quit();
             console.log('✅ Redis subscriber disconnected');
