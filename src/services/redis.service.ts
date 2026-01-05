@@ -1,7 +1,53 @@
 import Redis, { Redis as RedisClient } from 'ioredis';
 import { config } from '../config/config';
 
+// Define global type augmentation for Redis singleton
+declare global {
+    var redisClientInstance: RedisClient | undefined;
+}
+
 type SubscriptionCallback = (message: string) => void;
+
+/**
+ * Get or create singleton Redis client instance
+ */
+const getRedisClient = (): RedisClient => {
+    if (global.redisClientInstance) {
+        return global.redisClientInstance;
+    }
+
+    const redisUrl = config.redisUrl;
+    if (!redisUrl) {
+        throw new Error('REDIS_URL is not defined');
+    }
+
+    const redisOptions = {
+        // Connection pooling
+        maxRetriesPerRequest: null,
+        retryStrategy: (times: number) => {
+            const delay = Math.min(times * 50, 2000);
+            return delay;
+        },
+        reconnectOnError: (err: Error) => {
+            const targetError = 'READONLY';
+            if (err.message.includes(targetError)) {
+                return true;
+            }
+            return false;
+        },
+        // Keep-alive settings
+        keepAlive: 30000,
+        enableReadyCheck: true,
+        enableOfflineQueue: true,
+    };
+
+    const client = new Redis(redisUrl, redisOptions);
+    client.on('connect', () => console.log('✅ Redis client connected'));
+    client.on('error', (err) => console.error('❌ Redis client error:', err));
+
+    global.redisClientInstance = client;
+    return client;
+};
 
 class RedisService {
     private redis: RedisClient;
@@ -9,13 +55,12 @@ class RedisService {
     private subscriptions: Map<string, Set<SubscriptionCallback>> = new Map();
 
     constructor() {
-        const redisUrl = config.redisUrl;
+        // Get singleton base client
+        this.redis = getRedisClient();
 
-        if (!redisUrl) {
-            throw new Error('REDIS_URL is not defined');
-        }
-
-        const redisOptions = {
+        // Use duplicate() instead of new Redis() to reuse connection pool
+        // This shares the underlying socket but has its own command queue
+        this.subscriber = this.redis.duplicate({
             // Connection pooling
             maxRetriesPerRequest: null,
             retryStrategy: (times: number) => {
@@ -33,10 +78,7 @@ class RedisService {
             keepAlive: 30000,
             enableReadyCheck: true,
             enableOfflineQueue: true,
-        };
-
-        this.redis = new Redis(redisUrl, redisOptions);
-        this.subscriber = new Redis(redisUrl, redisOptions);
+        });
         this.setupEventHandlers();
     }
 
@@ -160,4 +202,18 @@ class RedisService {
     }
 }
 
-export const redisService = new RedisService();
+/**
+ * Singleton RedisService instance
+ * Reuses Redis connections across hot reloads in development
+ */
+declare global {
+    var redisServiceInstance: RedisService | undefined;
+}
+
+let redisServiceSingleton = global.redisServiceInstance;
+if (!redisServiceSingleton) {
+    redisServiceSingleton = new RedisService();
+    global.redisServiceInstance = redisServiceSingleton;
+}
+
+export const redisService = redisServiceSingleton;
