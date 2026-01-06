@@ -1,6 +1,6 @@
 import { socketEvent } from '../constants/socketEvents';
-import User from '../models/User';
 import { UserSockets } from '../types/socket';
+import { apiService } from './api.service';
 
 class UserService {
     private userSockets: UserSockets = new Map();
@@ -36,54 +36,9 @@ class UserService {
     ): Promise<void> {
         try {
             if (!userId) return;
-
-            const user = await User.findById(userId).select('-password');
-            if (user) {
-                user.isOnline = isOnline;
-                if (!isOnline) {
-                    user.lastAccessed = new Date();
-                }
-                await user.save();
-            }
+            await apiService.updateUserStatus(userId, isOnline);
         } catch (error) {
             console.error('Error updating user online status:', error);
-        }
-    }
-
-    async getUser(userId: string): Promise<any> {
-        try {
-            if (!userId) return null;
-
-            const user = await User.findById(userId);
-
-            return user;
-        } catch (err) {
-            console.log('Error get user ', err);
-        }
-    }
-
-    async getFriendsOnline(userId: string): Promise<string[]> {
-        try {
-            if (!userId) return [];
-
-            const user = await User.findById(userId)
-                .select('friends')
-                .populate('friends');
-            const friends = user?.friends || [];
-
-            // Lọc ra những bạn bè đang trực tuyến
-            const onlineFriends = friends.filter((friend: any) => {
-                return friend.isOnline;
-            });
-
-            console.log('Get friends online data: ', {
-                onlineFriends,
-            });
-
-            return onlineFriends;
-        } catch (error) {
-            console.error('Error getting friends:', error);
-            return [];
         }
     }
 
@@ -91,21 +46,24 @@ class UserService {
         try {
             if (!userId) return;
 
-            const user = await this.getUser(userId);
+            // Fetch user info to get name
+            const user = await apiService.getUser(userId);
+            const name = user ? user.name : '';
 
-            const friends = (await this.getFriendsOnline(userId)) as any[];
+            // Fetch online friends from API
+            const friends = await apiService.getOnlineFriends(userId);
 
             for (const friend of friends) {
-                const friendId = friend._id as string;
+                const friendId = friend._id;
                 if (friendId) {
-                    const friendIdStr = friendId.toString();
-                    const friendSockets = this.getUserSockets(friendIdStr);
-                    if (friendSockets) {
-                        friendSockets.forEach((socketId) => {
-                            io.to(socketId).emit(
-                                socketEvent.FRIEND_ONLINE,
-                                user
-                            );
+                    const friendSocketIds = this.getUserSockets(friendId);
+                    if (friendSocketIds) {
+                        friendSocketIds.forEach((socketId) => {
+                            io.to(socketId).emit(socketEvent.FRIEND_ONLINE, {
+                                _id: userId,
+                                isOnline: true,
+                                name,
+                            });
                         });
                     }
                 }
@@ -115,18 +73,15 @@ class UserService {
         }
     }
 
-    // Tối ưu: Lấy tất cả sockets của user một cách hiệu quả
     getAllUserSockets(): Map<string, Set<string>> {
         return new Map(this.userSockets);
     }
 
-    // Tối ưu: Kiểm tra user có online không
     isUserOnline(userId: string): boolean {
         const sockets = this.getUserSockets(userId);
         return sockets ? sockets.size > 0 : false;
     }
 
-    // Tối ưu: Lấy số lượng users online
     getOnlineUsersCount(): number {
         return this.userSockets.size;
     }

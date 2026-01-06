@@ -1,5 +1,5 @@
 import { ChatRoom } from '../types/socket';
-import Conversation from '../models/Conversation';
+import { apiService } from './api.service';
 
 class ChatService {
     private chatRooms: ChatRoom = {};
@@ -36,12 +36,7 @@ class ChatService {
     async getUserConversations(userId: string): Promise<any[]> {
         try {
             if (!userId) return [];
-
-            return await Conversation.find({
-                participants: {
-                    $elemMatch: { $eq: userId },
-                },
-            }).lean(); // Sử dụng lean() để tăng performance
+            return await apiService.getUserConversations(userId);
         } catch (error) {
             console.error('Error getting user conversations:', error);
             return [];
@@ -53,17 +48,14 @@ class ChatService {
         return this.chatRooms[roomId]?.has(socketId) || false;
     }
 
-    // Tối ưu: Lấy số lượng participants trong room
     getRoomParticipantsCount(roomId: string): number {
         return this.chatRooms[roomId]?.size || 0;
     }
 
-    // Tối ưu: Lấy tất cả rooms
     getAllRooms(): ChatRoom {
         return { ...this.chatRooms };
     }
 
-    // Tối ưu: Cleanup empty rooms
     cleanupEmptyRooms(): void {
         for (const [roomId, participants] of Object.entries(this.chatRooms)) {
             if (participants.size === 0) {
@@ -72,7 +64,6 @@ class ChatService {
         }
     }
 
-    // Tối ưu: Kiểm tra room có tồn tại không
     roomExists(roomId: string): boolean {
         return roomId in this.chatRooms;
     }

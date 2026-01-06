@@ -1,6 +1,6 @@
 import cron from 'node-cron';
-import User from '../models/User';
 import { log } from '../utils/logger';
+import { apiService } from '../services/api.service';
 
 const isDevelopment = process.env.NODE_ENV === 'development';
 
@@ -20,12 +20,7 @@ const getHeartbeatSchedule = () => {
 export function heartbeatCron() {
     cron.schedule(getHeartbeatSchedule(), async () => {
         log('HEARTBEAT CRON');
-        const now = Date.now();
-        const timeout = 60 * 1000;
 
-        await User.updateMany(
-            { lastAccessed: { $lt: new Date(now - timeout) } },
-            { isOnline: false }
-        );
+        await apiService.cleanupHeartbeat();
     });
 }

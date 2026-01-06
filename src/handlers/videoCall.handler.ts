@@ -1,6 +1,6 @@
 import { Socket } from 'socket.io';
-import User from '../models/User';
 import { userService } from '../services';
+import { apiService } from '../services/api.service';
 import { videoCallService } from '../services/videoCall.service';
 import type {
     RTCIceCandidateInit,
@@ -71,9 +71,7 @@ export class VideoCallSocketHandler {
             session.status = 'ringing';
 
             // Get initiator user info
-            const initiatorUser = await User.findById(this.userId).select(
-                '_id name avatar'
-            );
+            const initiatorUser = await apiService.getUser(this.userId);
             if (!initiatorUser) {
                 this.socket.emit(socketEvent.VIDEO_CALL_ERROR, {
                     error: 'Người dùng không tìm thấy',

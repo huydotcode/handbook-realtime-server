@@ -1,6 +1,5 @@
 import { Server } from 'socket.io';
 import { cronRun } from './cron/cron.handler';
-import { connectDB } from './database/mongodb';
 import { redisService, videoCallService } from './services';
 import { EventSubscriber } from './services/event.subscriber';
 
@@ -13,7 +12,7 @@ function clearVideoCall() {
 export async function prepare(io?: Server) {
     console.log('Preparing the project...');
 
-    await connectDB();
+    // DB connection removed (using API instead)
     redisService.getClient();
     cronRun();
     clearVideoCall();
