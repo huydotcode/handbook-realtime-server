@@ -55,3 +55,19 @@ export interface FriendRequestData {
         name: string;
     };
 }
+
+// Event Payloads
+export interface JoinRoomData {
+    roomId: string;
+    userId: string;
+}
+
+export interface SendMessageData {
+    message: MessageData;
+    roomId: string;
+}
+
+export interface ReadMessageData {
+    roomId: string;
+    userId: string;
+}

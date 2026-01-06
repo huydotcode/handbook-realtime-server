@@ -6,5 +6,4 @@ export function log(event: string, data?: any) {
     if (data) {
         console.log('\tARGS: ', data);
     }
-    console.log('====================================');
 }
