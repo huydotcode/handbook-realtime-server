@@ -8,12 +8,24 @@ import { Server } from 'socket.io';
 import { config } from './config/config';
 import { authMiddleware } from './middlwares/auth.middleware';
 import { prepare } from './prepare';
-import { SocketManager } from './socket/socket.manager';
 import { redisService } from './services/redis.service';
+import { SocketManager } from './socket/socket.manager';
+
+// Define global type augmentation for IO
+declare global {
+    var ioInstance: Server | undefined;
+}
 
 const app = express();
 const httpServer = createServer(app);
-const io = new Server(httpServer, config.socketOptions);
+const io = new Server(httpServer, {
+    cors: {
+        origin: config.corsOptions.origin,
+        methods: ['GET', 'POST'],
+    },
+});
+
+global.ioInstance = io;
 
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -27,11 +39,16 @@ io.on('connection', async (socket) => {
     await SocketManager.handleConnection(socket, io);
 });
 
+import internalRouter from './routes/internal.route';
+
+// Middleware
+app.use(express.json());
+
+// Routes
+app.use('/internal', internalRouter);
+
 app.get('/', (req, res) => {
-    res.send({
-        success: true,
-        message: 'Realtime server is running',
-    });
+    res.send('Realtime Server is running');
 });
 
 const server = httpServer.listen(config.port, () => {

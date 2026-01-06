@@ -15,227 +15,234 @@ const EVENT_CHANNELS = {
     POST_LIKED: 'post.liked',
 };
 
+export let eventSubscriber: EventSubscriber;
+
 export class EventSubscriber {
     private io: Server;
 
     constructor(io: Server) {
         this.io = io;
+        eventSubscriber = this; // Expose instance
         this.setupSubscriptions();
     }
 
     private setupSubscriptions() {
         console.log('🎧 Setting up event subscriptions...');
+        // We subscribe to all channels we care about on Redis too,
+        // in case other services still publish via Redis (hybrid mode).
+        // Since we refactored to use dispatch, we can just bind redis messages to dispatch.
 
-        // Subscribe to message events
-        this.subscribeToMessageEvents();
-
-        // Subscribe to notification events
-        this.subscribeToNotificationEvents();
-
-        // Subscribe to user events
-        this.subscribeToUserEvents();
-
-        // Subscribe to post events
-        this.subscribeToPostEvents();
+        const channels = Object.values(EVENT_CHANNELS);
+        channels.forEach((channel) => {
+            redisService.subscribe(channel, (message) => {
+                try {
+                    const data = JSON.parse(message);
+                    this.dispatch(channel, data);
+                } catch (error) {
+                    console.error(
+                        `Error parsing message for channel ${channel}:`,
+                        error
+                    );
+                }
+            });
+        });
 
         console.log('✅ Event subscriptions setup complete');
     }
 
-    private subscribeToMessageEvents() {
-        // Message created
-        redisService.subscribe(EVENT_CHANNELS.MESSAGE_CREATED, (message) => {
-            try {
-                const data = JSON.parse(message);
-                const {
-                    roomId,
-                    conversationId,
-                    conversationTitle,
-                    message: messageData,
-                } = data;
+    /**
+     * Dispatch an event to the appropriate handler.
+     * Can be called from Redis subscriber or Internal API.
+     */
+    public dispatch(channel: string, data: any) {
+        console.log(`⚡ Dispatching event: ${channel}`);
+        switch (channel) {
+            case EVENT_CHANNELS.MESSAGE_CREATED:
+                this.handleMessageCreated(data);
+                break;
+            case EVENT_CHANNELS.MESSAGE_READ:
+                this.handleMessageRead(data);
+                break;
+            case EVENT_CHANNELS.MESSAGE_DELETED:
+                this.handleMessageDeleted(data);
+                break;
+            case EVENT_CHANNELS.MESSAGE_PINNED:
+                this.handleMessagePinned(data);
+                break;
+            case EVENT_CHANNELS.MESSAGE_UNPINNED:
+                this.handleMessageUnpinned(data);
+                break;
+            case EVENT_CHANNELS.NOTIFICATION_SENT:
+                this.handleNotificationSent(data);
+                break;
+            case EVENT_CHANNELS.USER_STATUS_CHANGED:
+                this.handleUserStatusChanged(data);
+                break;
+            case EVENT_CHANNELS.POST_LIKED:
+                this.handlePostLiked(data);
+                break;
+            default:
+                console.warn(`⚠️ No handler for channel: ${channel}`);
+        }
+    }
 
-                // Prefer flattened conversationId, fallback to roomId
-                const targetRoomId = conversationId || roomId;
-                if (!targetRoomId) {
-                    console.warn(
-                        'MESSAGE_CREATED missing roomId/conversationId'
-                    );
-                    return;
-                }
+    private handleMessageCreated(data: any) {
+        try {
+            const {
+                roomId,
+                conversationId,
+                conversationTitle,
+                message: messageData,
+            } = data;
 
-                // Normalize payload so client always has conversationId
-                const normalizedMessage = {
-                    ...messageData,
-                    conversationId: conversationId || roomId,
-                    conversation: messageData?.conversation || undefined,
-                };
-
-                // Attach optional UI-friendly title if provided
-                if (
-                    conversationTitle &&
-                    !normalizedMessage.conversation?.title
-                ) {
-                    normalizedMessage.conversation = {
-                        ...(normalizedMessage.conversation || {}),
-                        title: conversationTitle,
-                    } as any;
-                }
-
-                console.log(
-                    `📥 Received MESSAGE_CREATED for room ${targetRoomId}`
-                );
-                this.io
-                    .to(targetRoomId)
-                    .emit(socketEvent.RECEIVE_MESSAGE, normalizedMessage);
-            } catch (error) {
-                console.error('Error handling MESSAGE_CREATED:', error);
+            // Prefer flattened conversationId, fallback to roomId
+            const targetRoomId = conversationId || roomId;
+            if (!targetRoomId) {
+                console.warn('MESSAGE_CREATED missing roomId/conversationId');
+                return;
             }
-        });
 
-        // Message read
-        redisService.subscribe(EVENT_CHANNELS.MESSAGE_READ, (message) => {
-            try {
-                const data = JSON.parse(message);
-                const { roomId, userId } = data;
+            // Normalize payload so client always has conversationId
+            const normalizedMessage = {
+                ...messageData,
+                conversationId: conversationId || roomId,
+                conversation: messageData?.conversation || undefined,
+            };
 
-                console.log(`📥 Received MESSAGE_READ for room ${roomId}`);
+            // Attach optional UI-friendly title if provided
+            if (conversationTitle && !normalizedMessage.conversation?.title) {
+                normalizedMessage.conversation = {
+                    ...(normalizedMessage.conversation || {}),
+                    title: conversationTitle,
+                } as any;
+            }
+
+            const roomSize =
+                this.io.sockets.adapter.rooms.get(targetRoomId)?.size || 0;
+
+            if (roomSize === 0) {
+                console.warn(
+                    `⚠️ Warning: Room ${targetRoomId} is empty! No clients will receive this message.`
+                );
+            }
+
+            this.io
+                .to(targetRoomId)
+                .emit(socketEvent.RECEIVE_MESSAGE, normalizedMessage);
+        } catch (error) {
+            console.error('Error handling MESSAGE_CREATED:', error);
+        }
+    }
+
+    private handleMessageRead(data: any) {
+        try {
+            const { roomId, userId } = data;
+            console.log(`📥 Received MESSAGE_READ for room ${roomId}`);
+            this.io
+                .to(roomId)
+                .emit(socketEvent.READ_MESSAGE, { roomId, userId });
+        } catch (error) {
+            console.error('Error handling MESSAGE_READ:', error);
+        }
+    }
+
+    private handleMessageDeleted(data: any) {
+        try {
+            const { message: messageData } = data;
+
+            // Accept either populated conversation or flattened id
+            const roomId =
+                messageData?.conversation?._id?.toString?.() ||
+                messageData?.conversationId ||
+                (typeof messageData?.conversation === 'string'
+                    ? messageData.conversation
+                    : undefined);
+
+            if (!roomId) {
+                console.warn('MESSAGE_DELETED missing conversation id');
+                return;
+            }
+
+            const normalizedMessage = {
+                ...messageData,
+                conversationId: roomId,
+            };
+
+            console.log(`📥 Received MESSAGE_DELETED for room ${roomId}`);
+            this.io
+                .to(roomId)
+                .emit(socketEvent.DELETE_MESSAGE, normalizedMessage);
+        } catch (error) {
+            console.error('Error handling MESSAGE_DELETED:', error);
+        }
+    }
+
+    private handleMessagePinned(data: any) {
+        try {
+            const { message: messageData } = data;
+            if (messageData?.conversation?._id) {
+                const roomId = messageData.conversation._id.toString();
+                console.log(`📥 Received MESSAGE_PINNED for room ${roomId}`);
+                this.io.to(roomId).emit(socketEvent.PIN_MESSAGE, messageData);
+            }
+        } catch (error) {
+            console.error('Error handling MESSAGE_PINNED:', error);
+        }
+    }
+
+    private handleMessageUnpinned(data: any) {
+        try {
+            const { message: messageData } = data;
+            if (messageData?.conversation?._id) {
+                const roomId = messageData.conversation._id.toString();
+                console.log(`📥 Received MESSAGE_UNPINNED for room ${roomId}`);
                 this.io
                     .to(roomId)
-                    .emit(socketEvent.READ_MESSAGE, { roomId, userId });
-            } catch (error) {
-                console.error('Error handling MESSAGE_READ:', error);
+                    .emit(socketEvent.UN_PIN_MESSAGE, messageData);
             }
-        });
-
-        // Message deleted
-        redisService.subscribe(EVENT_CHANNELS.MESSAGE_DELETED, (message) => {
-            try {
-                const data = JSON.parse(message);
-                const { message: messageData } = data;
-
-                // Accept either populated conversation or flattened id
-                const roomId =
-                    messageData?.conversation?._id?.toString?.() ||
-                    messageData?.conversationId ||
-                    (typeof messageData?.conversation === 'string'
-                        ? messageData.conversation
-                        : undefined);
-
-                if (!roomId) {
-                    console.warn('MESSAGE_DELETED missing conversation id');
-                    return;
-                }
-
-                const normalizedMessage = {
-                    ...messageData,
-                    conversationId: roomId,
-                };
-
-                console.log(`📥 Received MESSAGE_DELETED for room ${roomId}`);
-                this.io
-                    .to(roomId)
-                    .emit(socketEvent.DELETE_MESSAGE, normalizedMessage);
-            } catch (error) {
-                console.error('Error handling MESSAGE_DELETED:', error);
-            }
-        });
-
-        // Message pinned
-        redisService.subscribe(EVENT_CHANNELS.MESSAGE_PINNED, (message) => {
-            try {
-                const data = JSON.parse(message);
-                const { message: messageData } = data;
-
-                if (messageData?.conversation?._id) {
-                    const roomId = messageData.conversation._id.toString();
-                    console.log(
-                        `📥 Received MESSAGE_PINNED for room ${roomId}`
-                    );
-                    this.io
-                        .to(roomId)
-                        .emit(socketEvent.PIN_MESSAGE, messageData);
-                }
-            } catch (error) {
-                console.error('Error handling MESSAGE_PINNED:', error);
-            }
-        });
-
-        // Message unpinned
-        redisService.subscribe(EVENT_CHANNELS.MESSAGE_UNPINNED, (message) => {
-            try {
-                const data = JSON.parse(message);
-                const { message: messageData } = data;
-
-                if (messageData?.conversation?._id) {
-                    const roomId = messageData.conversation._id.toString();
-                    console.log(
-                        `📥 Received MESSAGE_UNPINNED for room ${roomId}`
-                    );
-                    this.io
-                        .to(roomId)
-                        .emit(socketEvent.UN_PIN_MESSAGE, messageData);
-                }
-            } catch (error) {
-                console.error('Error handling MESSAGE_UNPINNED:', error);
-            }
-        });
+        } catch (error) {
+            console.error('Error handling MESSAGE_UNPINNED:', error);
+        }
     }
 
-    private subscribeToNotificationEvents() {
-        // All notifications (including friend requests) now use NOTIFICATION_SENT
-        redisService.subscribe(EVENT_CHANNELS.NOTIFICATION_SENT, (message) => {
-            try {
-                const data = JSON.parse(message);
-                const { notification } = data;
-
-                const receiverId =
-                    notification.receiver?._id || notification.receiver;
-                console.log(
-                    `📥 Received NOTIFICATION_SENT to ${receiverId} (type: ${notification.type})`
-                );
-                this.sendNotificationToUser(receiverId, notification);
-            } catch (error) {
-                console.error('Error handling NOTIFICATION_SENT:', error);
-            }
-        });
+    private handleNotificationSent(data: any) {
+        try {
+            const { notification } = data;
+            const receiverId =
+                notification.receiver?._id || notification.receiver;
+            console.log(
+                `📥 Received NOTIFICATION_SENT to ${receiverId} (type: ${notification.type})`
+            );
+            this.sendNotificationToUser(receiverId, notification);
+        } catch (error) {
+            console.error('Error handling NOTIFICATION_SENT:', error);
+        }
     }
 
-    private subscribeToUserEvents() {
-        // User status changed
-        redisService.subscribe(
-            EVENT_CHANNELS.USER_STATUS_CHANGED,
-            (message) => {
-                try {
-                    const data = JSON.parse(message);
-                    const { userId, isOnline } = data;
-
-                    console.log(
-                        `📥 Received USER_STATUS_CHANGED: ${userId} - ${isOnline ? 'online' : 'offline'}`
-                    );
-                    // Handle user status change if needed
-                } catch (error) {
-                    console.error('Error handling USER_STATUS_CHANGED:', error);
-                }
-            }
-        );
+    private handleUserStatusChanged(data: any) {
+        try {
+            const { userId, isOnline } = data;
+            console.log(
+                `📥 Received USER_STATUS_CHANGED: ${userId} - ${isOnline ? 'online' : 'offline'}`
+            );
+            // Handle user status change if needed (currently logic was empty in original file)
+        } catch (error) {
+            console.error('Error handling USER_STATUS_CHANGED:', error);
+        }
     }
 
-    private subscribeToPostEvents() {
-        // Post liked
-        redisService.subscribe(EVENT_CHANNELS.POST_LIKED, (message) => {
-            try {
-                const data = JSON.parse(message);
-                const { authorId, notification } = data;
-
-                console.log(`📥 Received POST_LIKED for author ${authorId} `, {
-                    notification,
-                });
-                if (notification) {
-                    this.sendNotificationToUser(authorId, notification);
-                }
-            } catch (error) {
-                console.error('Error handling POST_LIKED:', error);
+    private handlePostLiked(data: any) {
+        try {
+            const { authorId, notification } = data;
+            console.log(`📥 Received POST_LIKED for author ${authorId} `, {
+                notification,
+            });
+            if (notification) {
+                this.sendNotificationToUser(authorId, notification);
             }
-        });
+        } catch (error) {
+            console.error('Error handling POST_LIKED:', error);
+        }
     }
 
     /**
