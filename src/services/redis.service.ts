@@ -1,5 +1,5 @@
 import Redis, { Redis as RedisClient } from 'ioredis';
-import { config } from '../config/config';
+import { config } from '../common/config/config';
 
 // Define global type augmentation for Redis singleton
 declare global {

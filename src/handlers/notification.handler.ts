@@ -1,7 +1,7 @@
 import { Socket } from 'socket.io';
-import { FriendRequestData, NotificationData } from '../types/socket';
-import { log } from '../utils/logger';
-import { SocketUtils } from '../utils/socket.utils';
+import { FriendRequestData, NotificationData } from '../common/types/socket';
+import { log } from '../common/utils/logger';
+import { SocketUtils } from '../common/utils/socket.utils';
 
 export class NotificationHandler {
     static handleSendNotification(

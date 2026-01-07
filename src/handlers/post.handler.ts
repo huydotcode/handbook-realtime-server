@@ -1,5 +1,4 @@
 import { Socket } from 'socket.io';
-import { log } from '../utils/logger';
 
 export class PostHandler {
     static async handleLikePost(

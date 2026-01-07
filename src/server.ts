@@ -5,7 +5,7 @@ import cors from 'cors';
 import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
-import { config } from './config/config';
+import { config } from './common/config/config';
 import { authMiddleware } from './middlwares/auth.middleware';
 import { prepare } from './prepare';
 import { redisService } from './services/redis.service';

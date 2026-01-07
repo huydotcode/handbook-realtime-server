@@ -1,5 +1,5 @@
 import { Socket } from 'socket.io';
-import { userService } from '../services';
+import { userService } from '../../services';
 
 export class SocketUtils {
     /**

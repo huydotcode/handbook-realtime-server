@@ -1,7 +1,7 @@
 import { Socket } from 'socket.io';
-import { socketEvent } from '../constants/socketEvents';
+import { socketEvent } from '../common/constants/socketEvents';
 import { chatService, userService } from '../services';
-import { log } from '../utils/logger';
+import { log } from '../common/utils/logger';
 import { SocketDispatcher } from './socket.dispatcher';
 
 export class SocketManager {

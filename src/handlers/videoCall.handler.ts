@@ -1,13 +1,13 @@
 import { Socket } from 'socket.io';
-import { userService } from '../services';
-import { apiService } from '../services/api.service';
-import { videoCallService } from '../services/videoCall.service';
+import { socketEvent } from '../common/constants/socketEvents';
 import type {
     RTCIceCandidateInit,
     RTCSessionDescriptionInit,
-} from '../types/webrtc';
-import { log } from '../utils/logger';
-import { socketEvent } from '../constants/socketEvents';
+} from '../common/types/webrtc';
+import { log } from '../common/utils/logger';
+import { userService } from '../services';
+import { apiService } from '../services/api.service';
+import { videoCallService } from '../services/videoCall.service';
 
 export class VideoCallSocketHandler {
     constructor(

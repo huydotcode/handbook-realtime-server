@@ -1,9 +1,9 @@
 import { Socket } from 'socket.io';
-import { socketEvent } from '../constants/socketEvents';
+import { socketEvent } from '../common/constants/socketEvents';
 import { chatService } from '../services/chat.service';
-import { MessageData } from '../types/socket';
-import { log } from '../utils/logger';
-import { SocketUtils } from '../utils/socket.utils';
+import { MessageData } from '../common/types/socket';
+import { log } from '../common/utils/logger';
+import { SocketUtils } from '../common/utils/socket.utils';
 
 export class MessageHandler {
     static handleJoinRoom(

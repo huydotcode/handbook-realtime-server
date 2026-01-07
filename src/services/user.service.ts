@@ -1,5 +1,5 @@
-import { socketEvent } from '../constants/socketEvents';
-import { UserSockets } from '../types/socket';
+import { socketEvent } from '../common/constants/socketEvents';
+import { UserSockets } from '../common/types/socket';
 import { apiService } from './api.service';
 
 class UserService {

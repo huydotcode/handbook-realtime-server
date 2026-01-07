@@ -1,4 +1,4 @@
-import { ChatRoom } from '../types/socket';
+import { ChatRoom } from '../common/types/socket';
 import { apiService } from './api.service';
 
 class ChatService {

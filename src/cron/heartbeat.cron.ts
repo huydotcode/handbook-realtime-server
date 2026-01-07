@@ -1,5 +1,5 @@
 import cron from 'node-cron';
-import { log } from '../utils/logger';
+import { log } from '../common/utils/logger';
 import { apiService } from '../services/api.service';
 
 const isDevelopment = process.env.NODE_ENV === 'development';

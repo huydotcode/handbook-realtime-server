@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { config } from '../config/config';
+import { config } from '../common/config/config';
 import { eventSubscriber } from '../services/event.subscriber';
 
 export class InternalController {
