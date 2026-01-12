@@ -1,4 +1,4 @@
-import { socketEvent } from '../common/constants/socketEvents';
+import { socketEvent } from '../common/constants/socket-events';
 import { UserSockets } from '../common/types/socket';
 import { apiService } from './api.service';
 

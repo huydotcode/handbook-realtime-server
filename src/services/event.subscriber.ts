@@ -1,7 +1,7 @@
 import { Server } from 'socket.io';
 import { redisService } from './redis.service';
 import { userService } from './user.service';
-import { socketEvent } from '../common/constants/socketEvents';
+import { socketEvent } from '../common/constants/socket-events';
 
 // Event channels constants
 const EVENT_CHANNELS = {
