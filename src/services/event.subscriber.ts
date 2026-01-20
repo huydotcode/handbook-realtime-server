@@ -27,11 +27,6 @@ export class EventSubscriber {
     }
 
     private setupSubscriptions() {
-        console.log('🎧 Setting up event subscriptions...');
-        // We subscribe to all channels we care about on Redis too,
-        // in case other services still publish via Redis (hybrid mode).
-        // Since we refactored to use dispatch, we can just bind redis messages to dispatch.
-
         const channels = Object.values(EVENT_CHANNELS);
         channels.forEach((channel) => {
             redisService.subscribe(channel, (message) => {
@@ -46,8 +41,6 @@ export class EventSubscriber {
                 }
             });
         });
-
-        console.log('✅ Event subscriptions setup complete');
     }
 
     /**
@@ -55,7 +48,7 @@ export class EventSubscriber {
      * Can be called from Redis subscriber or Internal API.
      */
     public dispatch(channel: string, data: any) {
-        console.log(`⚡ Dispatching event: ${channel}`);
+        console.log(`Dispatching event: ${channel}`);
         switch (channel) {
             case EVENT_CHANNELS.MESSAGE_CREATED:
                 this.handleMessageCreated(data);
@@ -82,7 +75,7 @@ export class EventSubscriber {
                 this.handlePostLiked(data);
                 break;
             default:
-                console.warn(`⚠️ No handler for channel: ${channel}`);
+                console.warn(`No handler for channel: ${channel}`);
         }
     }
 
@@ -122,7 +115,7 @@ export class EventSubscriber {
 
             if (roomSize === 0) {
                 console.warn(
-                    `⚠️ Warning: Room ${targetRoomId} is empty! No clients will receive this message.`
+                    `Warning: Room ${targetRoomId} is empty! No clients will receive this message.`
                 );
             }
 
@@ -137,7 +130,7 @@ export class EventSubscriber {
     private handleMessageRead(data: any) {
         try {
             const { roomId, userId } = data;
-            console.log(`📥 Received MESSAGE_READ for room ${roomId}`);
+            console.log(`Received MESSAGE_READ for room ${roomId}`);
             this.io
                 .to(roomId)
                 .emit(socketEvent.READ_MESSAGE, { roomId, userId });
@@ -168,7 +161,7 @@ export class EventSubscriber {
                 conversationId: roomId,
             };
 
-            console.log(`📥 Received MESSAGE_DELETED for room ${roomId}`);
+            console.log(`Received MESSAGE_DELETED for room ${roomId}`);
             this.io
                 .to(roomId)
                 .emit(socketEvent.DELETE_MESSAGE, normalizedMessage);
@@ -182,7 +175,7 @@ export class EventSubscriber {
             const { message: messageData } = data;
             if (messageData?.conversation?._id) {
                 const roomId = messageData.conversation._id.toString();
-                console.log(`📥 Received MESSAGE_PINNED for room ${roomId}`);
+                console.log(`Received MESSAGE_PINNED for room ${roomId}`);
                 this.io.to(roomId).emit(socketEvent.PIN_MESSAGE, messageData);
             }
         } catch (error) {
@@ -195,7 +188,7 @@ export class EventSubscriber {
             const { message: messageData } = data;
             if (messageData?.conversation?._id) {
                 const roomId = messageData.conversation._id.toString();
-                console.log(`📥 Received MESSAGE_UNPINNED for room ${roomId}`);
+                console.log(`Received MESSAGE_UNPINNED for room ${roomId}`);
                 this.io
                     .to(roomId)
                     .emit(socketEvent.UN_PIN_MESSAGE, messageData);
@@ -211,7 +204,7 @@ export class EventSubscriber {
             const receiverId =
                 notification.receiver?._id || notification.receiver;
             console.log(
-                `📥 Received NOTIFICATION_SENT to ${receiverId} (type: ${notification.type})`
+                `Received NOTIFICATION_SENT to ${receiverId} (type: ${notification.type})`
             );
             this.sendNotificationToUser(receiverId, notification);
         } catch (error) {
@@ -223,7 +216,7 @@ export class EventSubscriber {
         try {
             const { userId, isOnline } = data;
             console.log(
-                `📥 Received USER_STATUS_CHANGED: ${userId} - ${isOnline ? 'online' : 'offline'}`
+                `Received USER_STATUS_CHANGED: ${userId} - ${isOnline ? 'online' : 'offline'}`
             );
             // Handle user status change if needed (currently logic was empty in original file)
         } catch (error) {
@@ -234,7 +227,7 @@ export class EventSubscriber {
     private handlePostLiked(data: any) {
         try {
             const { authorId, notification } = data;
-            console.log(`📥 Received POST_LIKED for author ${authorId} `, {
+            console.log(`Received POST_LIKED for author ${authorId} `, {
                 notification,
             });
             if (notification) {
@@ -258,10 +251,10 @@ export class EventSubscriber {
                     .emit(socketEvent.RECEIVE_NOTIFICATION, notification);
             });
             console.log(
-                `✅ Sent notification to user ${userId} (${userSockets.size} sockets)`
+                `Sent notification to user ${userId} (${userSockets.size} sockets)`
             );
         } else {
-            console.log(`⚠️ User ${userId} has no active sockets`);
+            console.log(`User ${userId} has no active sockets`);
         }
     }
 }

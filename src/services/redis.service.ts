@@ -48,10 +48,10 @@ class RedisService {
 
     private setupEventHandlers() {
         this.subscriber.on('connect', () =>
-            console.log('✅ Redis subscriber connected')
+            console.log('Redis subscriber connected')
         );
         this.subscriber.on('error', (err) =>
-            console.error('❌ Redis subscriber error:', err)
+            console.error('Redis subscriber error:', err)
         );
 
         // Handle incoming messages
