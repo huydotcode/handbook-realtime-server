@@ -85,7 +85,7 @@ class RedisService {
         if (!this.subscriptions.has(channel)) {
             this.subscriptions.set(channel, new Set());
             this.subscriber.subscribe(channel);
-            console.log(`📥 Subscribed to channel: ${channel}`);
+            console.log(`Subscribed to channel: ${channel}`);
         }
 
         this.subscriptions.get(channel)!.add(callback);
@@ -105,12 +105,12 @@ class RedisService {
             if (callbacks.size === 0) {
                 this.subscriber.unsubscribe(channel);
                 this.subscriptions.delete(channel);
-                console.log(`📤 Unsubscribed from channel: ${channel}`);
+                console.log(`Unsubscribed from channel: ${channel}`);
             }
         } else {
             this.subscriber.unsubscribe(channel);
             this.subscriptions.delete(channel);
-            console.log(`📤 Unsubscribed from channel: ${channel}`);
+            console.log(`Unsubscribed from channel: ${channel}`);
         }
     }
 
@@ -120,7 +120,7 @@ class RedisService {
     unsubscribeAll(): void {
         this.subscriber.unsubscribe();
         this.subscriptions.clear();
-        console.log('📤 Unsubscribed from all channels');
+        console.log('Unsubscribed from all channels');
     }
 
     /**
@@ -129,7 +129,7 @@ class RedisService {
     async disconnect(): Promise<void> {
         try {
             await this.subscriber.quit();
-            console.log('✅ Redis subscriber disconnected');
+            console.log('Redis subscriber disconnected');
         } catch (error) {
             console.warn('Redis subscriber disconnect warning:', error);
         }
