@@ -20,7 +20,7 @@ export async function prepare(io?: Server) {
     // Initialize event subscriber if io instance is provided
     if (io) {
         new EventSubscriber(io);
-        console.log('✅ Event subscriber initialized');
+        console.log('Event subscriber initialized');
     }
 
     console.log('Project is ready.');
