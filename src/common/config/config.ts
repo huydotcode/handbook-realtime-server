@@ -8,8 +8,12 @@ export const config = {
     redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
     redis: {
         host: process.env.REDIS_HOST || 'localhost',
-        port: process.env.REDIS_PORT || 6379,
+        port: Number(process.env.REDIS_PORT) || 6379,
         password: process.env.REDIS_PASSWORD || '',
+    },
+    resend: {
+        apiKey: process.env.RESEND_API_KEY || '',
+        fromEmail: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
     },
     corsOptions: {
         origin: [
