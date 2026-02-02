@@ -10,7 +10,7 @@ import { authMiddleware } from './middlwares/auth.middleware';
 import { prepare } from './prepare';
 import { redisService } from './services/redis.service';
 import { SocketManager } from './socket/socket.manager';
-import './queues/email.worker';
+import { initEmailWorker } from './queues/email.worker';
 
 // Define global type augmentation for IO
 declare global {
@@ -54,6 +54,9 @@ app.get('/', (req, res) => {
 
 const server = httpServer.listen(config.port, () => {
     console.log(`Server is running on port ${config.port}`);
+
+    // Initialize email worker after server starts (lazy connection)
+    initEmailWorker();
 });
 
 // Graceful shutdown
