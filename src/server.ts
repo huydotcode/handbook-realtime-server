@@ -10,6 +10,7 @@ import { authMiddleware } from './middlwares/auth.middleware';
 import { prepare } from './prepare';
 import { redisService } from './services/redis.service';
 import { SocketManager } from './socket/socket.manager';
+import './queues/email.worker';
 
 // Define global type augmentation for IO
 declare global {
