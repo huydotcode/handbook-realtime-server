@@ -30,6 +30,7 @@ yarn-error.log*
 
 # ..env.local file
 .env
+.env.production
 
 # local .env.local files
 .env*.local
