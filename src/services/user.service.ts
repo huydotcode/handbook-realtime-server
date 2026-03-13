@@ -46,9 +46,21 @@ class UserService {
         try {
             if (!userId) return;
 
-            // Fetch user info to get name
+            const TIME_TO_NOTIFY = 60000; // 1 minute
+
             const user = await apiService.getUser(userId);
             const name = user ? user.name : '';
+
+            // Check if user lastAccessed is within 1 minute
+            const lastAccessed = user?.lastAccessed;
+            if (lastAccessed) {
+                const now = new Date();
+                const lastAccessedTime = new Date(lastAccessed);
+                const diff = now.getTime() - lastAccessedTime.getTime();
+                if (diff < TIME_TO_NOTIFY) {
+                    return;
+                }
+            }
 
             // Fetch online friends from API
             const friends = await apiService.getOnlineFriends(userId);
