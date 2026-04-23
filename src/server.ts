@@ -49,7 +49,7 @@ app.use(express.json());
 app.use('/internal', internalRouter);
 
 app.get('/', (req, res) => {
-    res.send('Realtime Server is running');
+    res.send('Realtime Server is running (VPS Version)');
 });
 
 const server = httpServer.listen(config.port, () => {
