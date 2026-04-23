@@ -1,0 +1,17 @@
+version: "3.8"
+
+services:
+  realtime-server:
+    image: ${IMAGE_REF}
+    container_name: realtime-server
+    restart: unless-stopped
+    ports:
+      - "5001:5001"
+    env_file:
+      - .env.production
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:5001/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
