@@ -107,6 +107,16 @@ jobs:
             export IMAGE_REF
             docker compose -f docker-compose.prod.yml up -d
 
-            # Basic health check
-            sleep 5
-            curl -fsS http://localhost:5001/ > /dev/null
+            # Basic health check with retries.
+            for i in $(seq 1 20); do
+              if curl -fsS http://localhost:5001/ > /dev/null; then
+                echo "Health check passed"
+                exit 0
+              fi
+              sleep 3
+            done
+
+            echo "Health check failed, printing recent container logs..."
+            docker compose -f docker-compose.prod.yml ps
+            docker compose -f docker-compose.prod.yml logs --tail=120 realtime-server
+            exit 1
