@@ -1,12 +1,17 @@
 import jwt from 'jsonwebtoken';
 import { Socket } from 'socket.io';
 import { ExtendedError } from 'socket.io/dist/namespace';
+import { getMaintenanceStatus } from '../common/maintenance';
 
 export const authMiddleware = (
     socket: Socket,
     next: (err?: ExtendedError) => void
 ) => {
     try {
+        if (getMaintenanceStatus()) {
+            return next(new Error('SERVER_MAINTENANCE'));
+        }
+
         const token = socket.handshake.auth.accessToken;
 
         if (!process.env.JWT_SECRET) {

@@ -37,9 +37,35 @@ app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cors(config.corsOptions));
 
+import { setMaintenanceStatus } from './common/maintenance';
+
 io.use(authMiddleware);
 
 prepare(io);
+
+// Subscribe to system:maintenance channel
+try {
+    redisService.subscribe('system:maintenance', (message: string) => {
+        try {
+            const data = JSON.parse(message);
+            setMaintenanceStatus(Boolean(data.active));
+            if (data.active) {
+                logger.warn('Server Maintenance mode activated via Redis event');
+                io.emit('server_maintenance', {
+                    message: data.message || 'Hệ thống đang bảo trì nâng cấp.',
+                });
+                io.sockets.disconnectSockets(true);
+            } else {
+                logger.info('Server Maintenance mode deactivated');
+                io.emit('server_maintenance_resolved');
+            }
+        } catch (err) {
+            logger.error('Failed to parse system:maintenance Redis message', err as Error);
+        }
+    });
+} catch (err) {
+    logger.warn('Could not subscribe to system:maintenance channel on startup', err as Error);
+}
 
 io.on('connection', async (socket) => {
     await SocketManager.handleConnection(socket, io);
